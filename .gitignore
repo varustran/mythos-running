@@ -24,4 +24,5 @@ next-env.d.ts
 
 coverage/
 scratch_*
+scripts/
 

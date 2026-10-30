@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Lock, Flame, ArrowLeft, Copy, Check, ShieldAlert, Clock } from "lucide-react";
+import { Lock, Flame, ArrowLeft, Copy, Check, ShieldAlert, Sparkles, KeyRound } from "lucide-react";
 import type { Locale } from "@/lib/i18n/settings";
 import { localePath } from "@/lib/i18n/settings";
 
@@ -30,27 +30,29 @@ export function NoteViewClient({ locale }: { locale: Locale }) {
       return;
     }
 
-    // Attempt to load note
     const fetchNote = async () => {
       try {
         const res = await fetch(`/api/notes/${slug}`);
-        if (res.ok) {
-          const data = await res.json();
-          setNoteData(data.note);
-          if (!data.note.is_password_protected) {
+        const data = await res.json();
+
+        if (res.ok && data.note) {
+          const isProt = Boolean(data.note.is_password_protected || data.note.isProtected);
+          const burn = Boolean(data.note.burn_after_read || data.note.burnAfterRead);
+
+          setNoteData({
+            title: data.note.title || "Ghi chú không tiêu đề",
+            content: data.note.content || "",
+            isProtected: isProt,
+            burnAfterRead: burn,
+          });
+
+          if (!isProt) {
             setUnlocked(true);
           }
         } else {
-          // Fallback demo for previewing
-          setNoteData({
-            title: "Tài liệu chia sẻ bảo mật",
-            content: "Nội dung ghi chú được mã hóa và bảo mật trên nền tảng Myso Notes.",
-            isProtected: false,
-            burnAfterRead: false,
-          });
-          setUnlocked(true);
+          setErrorMsg(data.error || "Ghi chú không tồn tại, đã tự hủy hoặc hết hạn lưu trữ.");
         }
-      } catch {
+      } catch (err: any) {
         setErrorMsg("Không thể kết nối đến máy chủ.");
       } finally {
         setLoading(false);
@@ -68,8 +70,13 @@ export function NoteViewClient({ locale }: { locale: Locale }) {
       const data = await res.json();
       if (!res.ok) {
         setErrorMsg(data.error || "Mật khẩu không chính xác.");
-      } else {
-        setNoteData(data.note);
+      } else if (data.note) {
+        setNoteData({
+          title: data.note.title || "Ghi chú không tiêu đề",
+          content: data.note.content || "",
+          isProtected: Boolean(data.note.is_password_protected),
+          burnAfterRead: Boolean(data.note.burn_after_read),
+        });
         setUnlocked(true);
       }
     } catch {
@@ -78,7 +85,7 @@ export function NoteViewClient({ locale }: { locale: Locale }) {
   };
 
   const copyContent = () => {
-    if (!noteData) return;
+    if (!noteData?.content) return;
     navigator.clipboard.writeText(noteData.content);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -97,60 +104,84 @@ export function NoteViewClient({ locale }: { locale: Locale }) {
       <div className="card p-6 sm:p-8 border border-line bg-surface shadow-2xl">
         {loading ? (
           <div className="text-center py-12 font-mono text-xs text-muted">
-            Đang giải mã nội dung ghi chú...
+            Đang giải mã và tải nội dung ghi chú...
           </div>
         ) : errorMsg && !noteData ? (
-          <div className="text-center py-10">
-            <ShieldAlert className="mx-auto h-10 w-10 text-red-400" />
-            <h3 className="mt-3 font-display text-lg font-bold text-ink">Ghi chú không khả dụng</h3>
-            <p className="mt-1 text-xs text-muted">Ghi chú có thể đã bị xóa, tự hủy hoặc hết hạn lưu trữ.</p>
+          <div className="text-center py-12 space-y-3">
+            <ShieldAlert className="mx-auto h-12 w-12 text-rose-500/80" />
+            <h3 className="font-display text-xl font-bold text-ink">Ghi chú không khả dụng</h3>
+            <p className="text-xs sm:text-sm text-muted max-w-sm mx-auto leading-relaxed">
+              {errorMsg}
+            </p>
+            <div className="pt-4">
+              <Link
+                href={localePath(locale, "/notes")}
+                className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-xs font-semibold text-white dark:text-[#04101F] hover:opacity-90 transition shadow-sm"
+              >
+                <Sparkles className="h-4 w-4" />
+                <span>Tạo ghi chú mới ngay</span>
+              </Link>
+            </div>
           </div>
         ) : !unlocked ? (
           <form onSubmit={handleUnlock} className="text-center py-8 max-w-sm mx-auto space-y-4">
-            <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-accent/10 text-accent">
-              <Lock className="h-6 w-6" />
+            <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-accent/15 text-accent border border-accent/30">
+              <KeyRound className="h-7 w-7" />
             </div>
-            <h3 className="font-display text-lg font-bold text-ink">Ghi chú này đã được khóa</h3>
-            <p className="text-xs text-muted">Vui lòng nhập mật mã bảo vệ để mở khóa nội dung.</p>
+            <h3 className="font-display text-xl font-bold text-ink">Ghi chú đã được khóa mật mã</h3>
+            <p className="text-xs text-muted">Vui lòng nhập mật mã của người gửi để mở khóa và giải mã nội dung.</p>
 
-            {errorMsg && <p className="text-xs text-red-400 font-mono">{errorMsg}</p>}
+            {errorMsg && (
+              <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-400 font-mono">
+                {errorMsg}
+              </div>
+            )}
 
             <input
               type="password"
               required
               value={passwordInput}
               onChange={(e) => setPasswordInput(e.target.value)}
-              placeholder="Nhập mã mở khóa..."
+              placeholder="Nhập mật mã bảo vệ..."
               className="w-full rounded-xl border border-line bg-canvas p-3 text-sm text-ink focus:border-accent focus:outline-none transition text-center"
             />
             <button
               type="submit"
-              className="w-full rounded-xl bg-accent py-2.5 text-xs font-semibold text-white dark:text-[#04101F] hover:opacity-90 transition shadow-md"
+              className="w-full rounded-xl bg-accent py-3 text-xs font-semibold text-white dark:text-[#04101F] hover:opacity-90 transition shadow-md"
             >
               Mở Khóa Ghi Chú
             </button>
           </form>
         ) : (
           <div>
-            <div className="flex items-center justify-between border-b border-line pb-4 mb-4">
-              <h2 className="font-display text-xl font-bold text-ink">{noteData?.title}</h2>
+            <div className="flex items-center justify-between border-b border-line pb-4 mb-5">
+              <div>
+                <span className="font-mono text-[0.65rem] text-accent uppercase font-bold tracking-wider">
+                  MYSO SECURE PASTEBIN
+                </span>
+                <h2 className="font-display text-xl font-bold text-ink mt-0.5">
+                  {noteData?.title || "Ghi chú không tiêu đề"}
+                </h2>
+              </div>
               <button
                 onClick={copyContent}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-canvas px-3 py-1.5 text-xs font-mono text-ink hover:border-accent transition"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-canvas px-3.5 py-2 text-xs font-mono text-ink hover:border-accent transition shadow-xs"
               >
-                {copied ? <Check className="h-3 w-3 text-teal" /> : <Copy className="h-3 w-3" />}
-                {copied ? "Đã chép" : "Sao chép"}
+                {copied ? <Check className="h-3.5 w-3.5 text-teal" /> : <Copy className="h-3.5 w-3.5" />}
+                <span>{copied ? "Đã sao chép" : "Sao chép"}</span>
               </button>
             </div>
 
-            <div className="rounded-xl border border-line bg-canvas p-4 text-sm font-mono text-ink whitespace-pre-wrap leading-relaxed">
+            <div className="rounded-xl border border-line bg-canvas p-5 text-sm font-mono text-ink whitespace-pre-wrap leading-relaxed min-h-[140px] select-all">
               {noteData?.content}
             </div>
 
             {noteData?.burnAfterRead && (
-              <div className="mt-4 flex items-center gap-2 text-xs text-red-400 font-mono">
-                <Flame className="h-3.5 w-3.5 shrink-0" />
-                <span>Ghi chú này đã tự động kích hoạt chế độ tự hủy sau khi đọc.</span>
+              <div className="mt-4 flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-400 font-mono">
+                <Flame className="h-4 w-4 shrink-0 text-rose-500" />
+                <span>
+                  Chế độ tự hủy (Burn-after-reading) đã kích hoạt: Ghi chú này đã được xóa vĩnh viễn khỏi máy chủ sau khi bạn xem xong.
+                </span>
               </div>
             )}
           </div>
