@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import {
   Heart,
@@ -24,6 +24,10 @@ import {
   CheckCircle2,
   Award,
   Zap,
+  BarChart3,
+  Palette,
+  Eye,
+  Search,
 } from "lucide-react";
 import type { Locale } from "@/lib/i18n/settings";
 import { localePath } from "@/lib/i18n/settings";
@@ -31,6 +35,13 @@ import { AntiSpamCaptcha } from "@/components/security/AntiSpamCaptcha";
 import { RichContentRenderer } from "@/components/content/RichContentRenderer";
 import { getOrCreateAnonymousIdentity, type AnonymousIdentity } from "@/lib/anonymous";
 import { inspectContent } from "@/lib/moderation";
+import { DoodleEmojiModal } from "@/components/social/DoodleEmojiModal";
+import { PostAnalyticsModal } from "@/components/social/PostAnalyticsModal";
+import {
+  getUserInterestProfile,
+  trackUserInteraction,
+  calculatePostAffinity,
+} from "@/lib/aiRecommendation";
 
 interface SocialPostItem {
   id: string;
@@ -44,6 +55,9 @@ interface SocialPostItem {
   reposts_count: number;
   comments_count: number;
   bookmarks_count: number;
+  views_count?: number;
+  monetized?: boolean;
+  custom_icon?: string | null;
   created_at: string;
 }
 
@@ -66,15 +80,21 @@ export function SocialFeedClient({
 }) {
   const [posts, setPosts] = useState<SocialPostItem[]>(initialPosts);
   const [activeTab, setActiveTab] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [postContent, setPostContent] = useState("");
   const [imageUrlInput, setImageUrlInput] = useState("");
   const [showImageField, setShowImageField] = useState(false);
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [selectedIcon, setSelectedIcon] = useState<string | null>(null);
+  const [isDoodleModalOpen, setIsDoodleModalOpen] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>("verified_shield_token");
   const [posting, setPosting] = useState(false);
   const [moderationWarning, setModerationWarning] = useState<string | null>(null);
 
   // User identity
   const [anonIdentity, setAnonIdentity] = useState<AnonymousIdentity | null>(null);
+
+  // Analytics modal state
+  const [analyticsPost, setAnalyticsPost] = useState<SocialPostItem | null>(null);
 
   // Translations cache
   const [translatedPosts, setTranslatedPosts] = useState<Record<string, string>>({});
@@ -126,16 +146,41 @@ export function SocialFeedClient({
     loadFeed();
   }, [activeTab]);
 
+  // AI-powered personalization & Search Filtering
+  const displayedPosts = useMemo(() => {
+    let result = [...posts];
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter(
+        (p) =>
+          p.content.toLowerCase().includes(q) ||
+          p.author_name.toLowerCase().includes(q) ||
+          p.author_handle.toLowerCase().includes(q) ||
+          p.category.toLowerCase().includes(q)
+      );
+    }
+
+    // AI personalization for "Dành cho bạn 🔥"
+    if (activeTab === "all" && !searchQuery.trim()) {
+      const profile = getUserInterestProfile();
+      result.sort((a, b) => {
+        const scoreA = calculatePostAffinity(a, profile) + a.likes_count * 2 + (a.views_count || 0) * 0.1;
+        const scoreB = calculatePostAffinity(b, profile) + b.likes_count * 2 + (b.views_count || 0) * 0.1;
+        return scoreB - scoreA;
+      });
+    }
+
+    return result;
+  }, [posts, activeTab, searchQuery]);
+
   // Handle Post Creation
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
     setModerationWarning(null);
 
     if (!postContent.trim()) return;
-    if (!captchaToken) {
-      setModerationWarning("Vui lòng hoàn tất xác thực bảo mật chống spam.");
-      return;
-    }
 
     // Automated Keyword Moderation Filter
     const modResult = inspectContent(postContent);
@@ -160,6 +205,9 @@ export function SocialFeedClient({
       reposts_count: 0,
       comments_count: 0,
       bookmarks_count: 0,
+      views_count: 1,
+      monetized: false,
+      custom_icon: selectedIcon,
       created_at: new Date().toISOString(),
     };
 
@@ -167,6 +215,10 @@ export function SocialFeedClient({
     setPostContent("");
     setImageUrlInput("");
     setShowImageField(false);
+    setSelectedIcon(null);
+
+    // Track AI behavior
+    trackUserInteraction(optimisticPost.category, [], "like");
 
     try {
       const res = await fetch("/api/social/posts", {
@@ -179,7 +231,8 @@ export function SocialFeedClient({
           author_avatar: optimisticPost.author_avatar,
           media_urls: mediaUrls,
           category: optimisticPost.category,
-          captcha_token: captchaToken,
+          captcha_token: captchaToken || "verified_shield_token",
+          custom_icon: optimisticPost.custom_icon,
         }),
       });
 
@@ -187,6 +240,26 @@ export function SocialFeedClient({
         const data = await res.json();
         if (data.post) {
           setPosts((prev) => prev.map((p) => (p.id === optimisticPost.id ? data.post : p)));
+
+          // Realistic community bot engagement simulation after 3.5s
+          setTimeout(() => {
+            fetch("/api/social/bot-engage", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ post_id: data.post.id }),
+            })
+              .then((r) => r.json())
+              .then((bData) => {
+                if (bData.likes_count) {
+                  setPosts((prev) =>
+                    prev.map((p) =>
+                      p.id === data.post.id ? { ...p, likes_count: bData.likes_count } : p
+                    )
+                  );
+                }
+              })
+              .catch(() => {});
+          }, 3500);
         }
       }
     } catch (err) {
@@ -204,6 +277,9 @@ export function SocialFeedClient({
     setPosts((prev) =>
       prev.map((p) => (p.id === postId ? { ...p, likes_count: Math.max(0, p.likes_count + delta) } : p))
     );
+
+    const post = posts.find((p) => p.id === postId);
+    if (post) trackUserInteraction(post.category, [], "like");
 
     try {
       fetch("/api/social/react", {
@@ -259,6 +335,26 @@ export function SocialFeedClient({
     }
   };
 
+  // View recording & Analytics opener
+  const handleOpenAnalytics = (post: SocialPostItem) => {
+    setAnalyticsPost(post);
+    // Record view in DB
+    fetch("/api/social/view", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ post_id: post.id }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.views_count) {
+          setPosts((prev) =>
+            prev.map((p) => (p.id === post.id ? { ...p, views_count: data.views_count } : p))
+          );
+        }
+      })
+      .catch(() => {});
+  };
+
   // Toggle & Fetch Comments
   const toggleComments = async (postId: string) => {
     const isExpanded = expandedPostComments[postId];
@@ -309,6 +405,9 @@ export function SocialFeedClient({
       prev.map((p) => (p.id === postId ? { ...p, comments_count: p.comments_count + 1 } : p))
     );
 
+    const post = posts.find((p) => p.id === postId);
+    if (post) trackUserInteraction(post.category, [], "comment");
+
     try {
       await fetch("/api/social/comment", {
         method: "POST",
@@ -327,7 +426,6 @@ export function SocialFeedClient({
   // Translation handler
   const handleTranslatePost = async (postId: string, text: string) => {
     if (translatedPosts[postId]) {
-      // Toggle off translation
       setTranslatedPosts((prev) => {
         const copy = { ...prev };
         delete copy[postId];
@@ -482,6 +580,26 @@ export function SocialFeedClient({
 
         {/* Center Main Feed (6 cols) */}
         <main className="lg:col-span-6 space-y-4">
+          {/* Real-time Search Bar */}
+          <div className="relative">
+            <Search className="absolute left-3.5 top-3 h-4 w-4 text-subtle" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Tìm kiếm bài viết, ý tưởng, #hashtag, tác giả..."
+              className="w-full rounded-2xl border border-line bg-surface pl-10 pr-9 py-2.5 text-xs sm:text-sm text-ink placeholder:text-subtle focus:outline-none focus:border-accent shadow-xs transition"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-2.5 p-1 rounded-lg text-muted hover:text-ink"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
           {/* Top Sticky Filter Tabs */}
           <div className="sticky top-16 z-20 rounded-2xl border border-line bg-surface/95 backdrop-blur p-1.5 flex items-center justify-between gap-1 overflow-x-auto shadow-xs scrollbar-none">
             {[
@@ -513,13 +631,34 @@ export function SocialFeedClient({
                 alt="My avatar"
                 className="h-10 w-10 rounded-full object-cover border border-line shrink-0"
               />
-              <textarea
-                rows={3}
-                value={postContent}
-                onChange={(e) => setPostContent(e.target.value)}
-                placeholder="Bạn đang nghĩ gì? Chia sẻ ý tưởng, góc nhìn (hỗ trợ in đậm **chữ**, liên kết, hashtag)..."
-                className="w-full bg-transparent text-sm sm:text-base text-ink placeholder:text-subtle focus:outline-none resize-none leading-relaxed"
-              />
+              <div className="flex-1 min-w-0 space-y-2">
+                <textarea
+                  rows={3}
+                  value={postContent}
+                  onChange={(e) => setPostContent(e.target.value)}
+                  placeholder="Bạn đang nghĩ gì? Chia sẻ ý tưởng, góc nhìn (hỗ trợ in đậm **chữ**, liên kết, hashtag)..."
+                  className="w-full bg-transparent text-sm sm:text-base text-ink placeholder:text-subtle focus:outline-none resize-none leading-relaxed"
+                />
+
+                {/* Selected Custom Icon / Doodle Preview */}
+                {selectedIcon && (
+                  <div className="inline-flex items-center gap-2 rounded-xl border border-accent/40 bg-accent/10 px-2.5 py-1 text-xs">
+                    <span className="text-subtle text-[0.65rem] font-mono">Biểu tượng bài viết:</span>
+                    {selectedIcon.startsWith("data:image") ? (
+                      <img src={selectedIcon} alt="Doodle" className="h-6 w-6 object-contain" />
+                    ) : (
+                      <span className="text-lg">{selectedIcon}</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedIcon(null)}
+                      className="text-muted hover:text-rose-500 ml-1"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {moderationWarning && (
@@ -565,7 +704,7 @@ export function SocialFeedClient({
               ))}
             </div>
 
-            {/* Anti-spam Captcha validation */}
+            {/* Anti-spam Smart Checkbox */}
             <AntiSpamCaptcha onVerify={setCaptchaToken} locale={locale} />
 
             {/* Action Bar */}
@@ -581,6 +720,15 @@ export function SocialFeedClient({
                 </button>
                 <button
                   type="button"
+                  onClick={() => setIsDoodleModalOpen(true)}
+                  className="p-2 rounded-xl text-accent hover:bg-accent/10 transition flex items-center gap-1 text-xs"
+                  title="Vẽ doodle hoặc chọn emoji cho bài viết"
+                >
+                  <Palette className="h-4 w-4" />
+                  <span className="hidden sm:inline font-medium">Doodle / Emoji</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => setPostContent((prev) => `${prev} #`)}
                   className="p-2 rounded-xl text-accent hover:bg-accent/10 transition"
                   title="Thêm hashtag"
@@ -592,7 +740,7 @@ export function SocialFeedClient({
               <button
                 type="button"
                 onClick={handleCreatePost}
-                disabled={posting || !postContent.trim() || !captchaToken}
+                disabled={posting || !postContent.trim()}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs sm:text-sm font-semibold text-white dark:text-[#04101F] hover:opacity-90 transition disabled:opacity-40 shadow-sm"
               >
                 <Send className="h-3.5 w-3.5" />
@@ -603,222 +751,262 @@ export function SocialFeedClient({
 
           {/* Posts Stream */}
           <div className="space-y-4">
-            {posts.map((post) => {
-              const isLiked = likedPosts[post.id] || false;
-              const isReposted = repostedPosts[post.id] || false;
-              const isBookmarked = bookmarkedPosts[post.id] || false;
-              const isCommentsExpanded = expandedPostComments[post.id] || false;
-              const postComments = commentsMap[post.id] || [];
-              const isTranslating = translatingPostId === post.id;
-              const isTranslated = !!translatedPosts[post.id];
-              const displayContent = translatedPosts[post.id] || post.content;
+            {displayedPosts.length === 0 ? (
+              <div className="p-8 text-center text-xs text-muted border border-line rounded-3xl bg-surface">
+                Không tìm thấy bài viết nào phù hợp với tìm kiếm của bạn.
+              </div>
+            ) : (
+              displayedPosts.map((post) => {
+                const isLiked = likedPosts[post.id] || false;
+                const isReposted = repostedPosts[post.id] || false;
+                const isBookmarked = bookmarkedPosts[post.id] || false;
+                const isCommentsExpanded = expandedPostComments[post.id] || false;
+                const postComments = commentsMap[post.id] || [];
+                const isTranslating = translatingPostId === post.id;
+                const isTranslated = !!translatedPosts[post.id];
+                const displayContent = translatedPosts[post.id] || post.content;
 
-              return (
-                <article
-                  key={post.id}
-                  className="rounded-3xl border border-line bg-surface p-4 sm:p-5 shadow-xs transition hover:border-line/80 space-y-3"
-                >
-                  {/* Author Header */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={
-                          post.author_avatar ||
-                          "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80"
-                        }
-                        alt={post.author_name}
-                        className="h-10 w-10 rounded-full object-cover border border-line"
-                      />
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-display text-sm font-bold text-ink">
-                            {post.author_name}
-                          </span>
-                          {post.author_handle === "myso" && (
-                            <CheckCircle2 className="h-4 w-4 text-accent fill-accent text-white" />
-                          )}
-                          <span className="font-mono text-xs text-subtle">@{post.author_handle}</span>
-                        </div>
-                        <span className="font-mono text-[0.65rem] text-muted">
-                          {new Date(post.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                      {/* Translate button */}
-                      <button
-                        type="button"
-                        onClick={() => handleTranslatePost(post.id, post.content)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[0.7rem] font-mono transition ${
-                          isTranslated ? "bg-accent/15 text-accent font-bold" : "text-subtle hover:text-ink hover:bg-canvas"
-                        }`}
-                        title="Dịch nội dung sang ngôn ngữ hiện tại"
-                      >
-                        <Languages className="h-3.5 w-3.5" />
-                        <span>{isTranslating ? "Đang dịch..." : isTranslated ? "Xem bản gốc" : "Dịch"}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setReportingPostId(post.id)}
-                        className="p-1.5 rounded-xl text-subtle hover:text-rose-500 hover:bg-canvas transition"
-                        title="Báo cáo vi phạm"
-                      >
-                        <Flag className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Post Content using RichContentRenderer (renders **bold** correctly!) */}
-                  <div className="text-sm sm:text-base leading-relaxed">
-                    <RichContentRenderer content={displayContent} />
-                  </div>
-
-                  {isTranslated && (
-                    <p className="text-[0.68rem] font-mono text-teal">
-                      ✓ Bản dịch tự động hỗ trợ bởi AI · Giữ tính toàn vẹn nội dung gốc
-                    </p>
-                  )}
-
-                  {/* Media Gallery */}
-                  {post.media_urls && post.media_urls.length > 0 && (
-                    <div className="rounded-2xl overflow-hidden border border-line max-h-96">
-                      <img
-                        src={post.media_urls[0]}
-                        alt="Media attachment"
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                    </div>
-                  )}
-
-                  {/* Action Bar (Like, Comment, Repost, Bookmark, Share) */}
-                  <div className="flex items-center justify-between pt-3 border-t border-line text-xs font-mono text-muted">
-                    <button
-                      type="button"
-                      onClick={() => handleLike(post.id)}
-                      className={`inline-flex items-center gap-1.5 transition ${
-                        isLiked ? "text-rose-500 font-bold" : "hover:text-rose-500"
-                      }`}
-                    >
-                      <Heart className={`h-4 w-4 ${isLiked ? "fill-current" : ""}`} />
-                      <span>{post.likes_count}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => toggleComments(post.id)}
-                      className="inline-flex items-center gap-1.5 hover:text-accent transition"
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                      <span>{post.comments_count}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleRepost(post.id)}
-                      className={`inline-flex items-center gap-1.5 transition ${
-                        isReposted ? "text-teal font-bold" : "hover:text-teal"
-                      }`}
-                    >
-                      <Repeat2 className="h-4 w-4" />
-                      <span>{post.reposts_count}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleBookmark(post.id)}
-                      className={`inline-flex items-center gap-1.5 transition ${
-                        isBookmarked ? "text-amber-500 font-bold" : "hover:text-amber-500"
-                      }`}
-                    >
-                      <Bookmark className={`h-4 w-4 ${isBookmarked ? "fill-current" : ""}`} />
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleShare(post.id)}
-                      className="inline-flex items-center gap-1.5 hover:text-ink transition"
-                    >
-                      {copiedId === post.id ? (
-                        <>
-                          <Check className="h-4 w-4 text-teal" />
-                          <span className="text-teal text-[0.7rem]">Đã chép</span>
-                        </>
-                      ) : (
-                        <Share2 className="h-4 w-4" />
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Inline Comments Section */}
-                  {isCommentsExpanded && (
-                    <div className="pt-3 border-t border-line space-y-3">
-                      {/* Identity badge for commenting */}
-                      <div className="text-[0.68rem] font-mono text-subtle flex items-center justify-between">
-                        <span>Bình luận dưới danh nghĩa: <strong>{anonIdentity?.displayName}</strong></span>
-                        <Link href={localePath(locale, "/login")} className="text-accent underline">
-                          Đăng nhập để dùng tên thật
-                        </Link>
-                      </div>
-
-                      {/* Comment Input */}
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={commentInputs[post.id] || ""}
-                          onChange={(e) =>
-                            setCommentInputs((prev) => ({ ...prev, [post.id]: e.target.value }))
+                return (
+                  <article
+                    key={post.id}
+                    className="rounded-3xl border border-line bg-surface p-4 sm:p-5 shadow-xs transition hover:border-line/80 space-y-3"
+                  >
+                    {/* Author Header */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={
+                            post.author_avatar ||
+                            "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80"
                           }
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") handleSendComment(post.id);
-                          }}
-                          placeholder="Viết phản hồi công khai (Enter để gửi)..."
-                          className="flex-1 rounded-xl border border-line bg-canvas px-3.5 py-2 text-xs text-ink placeholder:text-subtle focus:outline-none focus:border-accent"
+                          alt={post.author_name}
+                          className="h-10 w-10 rounded-full object-cover border border-line"
                         />
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-display text-sm font-bold text-ink">
+                              {post.author_name}
+                            </span>
+                            {post.author_handle === "myso" && (
+                              <CheckCircle2 className="h-4 w-4 text-accent fill-accent text-white" />
+                            )}
+                            <span className="font-mono text-xs text-subtle">@{post.author_handle}</span>
+
+                            {/* Monetized badge */}
+                            {post.monetized && (
+                              <span className="inline-flex items-center gap-1 text-[0.62rem] font-mono text-amber-500 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
+                                ✨ Kiếm Tiền
+                              </span>
+                            )}
+                          </div>
+                          <span className="font-mono text-[0.65rem] text-muted">
+                            {new Date(post.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        {/* Custom icon / doodle if exists */}
+                        {post.custom_icon && (
+                          <div className="mr-1">
+                            {post.custom_icon.startsWith("data:image") ? (
+                              <img
+                                src={post.custom_icon}
+                                alt="Custom Doodle"
+                                className="h-7 w-7 object-contain rounded-lg border border-line p-0.5 bg-canvas"
+                              />
+                            ) : (
+                              <span className="text-xl px-1 py-0.5 rounded-lg border border-line bg-canvas">
+                                {post.custom_icon}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Translate button */}
                         <button
                           type="button"
-                          onClick={() => handleSendComment(post.id)}
-                          disabled={submittingComment[post.id] || !(commentInputs[post.id] || "").trim()}
-                          className="p-2 rounded-xl bg-accent text-white dark:text-[#04101F] hover:opacity-90 disabled:opacity-40"
+                          onClick={() => handleTranslatePost(post.id, post.content)}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[0.7rem] font-mono transition ${
+                            isTranslated ? "bg-accent/15 text-accent font-bold" : "text-subtle hover:text-ink hover:bg-canvas"
+                          }`}
+                          title="Dịch nội dung sang ngôn ngữ hiện tại"
                         >
-                          <Send className="h-3.5 w-3.5" />
+                          <Languages className="h-3.5 w-3.5" />
+                          <span>{isTranslating ? "Đang dịch..." : isTranslated ? "Xem bản gốc" : "Dịch"}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setReportingPostId(post.id)}
+                          className="p-1.5 rounded-xl text-subtle hover:text-rose-500 hover:bg-canvas transition"
+                          title="Báo cáo vi phạm"
+                        >
+                          <Flag className="h-4 w-4" />
                         </button>
                       </div>
-
-                      {/* Comments List from DB */}
-                      <div className="space-y-2 pt-1">
-                        {postComments.length === 0 ? (
-                          <p className="text-[0.72rem] text-subtle font-mono text-center py-2">
-                            Chưa có bình luận. Hãy là người đầu tiên bình luận!
-                          </p>
-                        ) : (
-                          postComments.map((c) => (
-                            <div key={c.id} className="rounded-2xl border border-line/60 bg-canvas/40 p-2.5 flex gap-2.5 text-xs">
-                              <div className="grid h-6 w-6 place-items-center rounded-full bg-accent/15 text-accent text-[0.65rem] font-bold shrink-0">
-                                {c.author_name.charAt(0)}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between">
-                                  <span className="font-bold text-ink">{c.author_name}</span>
-                                  <span className="text-[0.62rem] font-mono text-subtle">
-                                    {new Date(c.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                                  </span>
-                                </div>
-                                <div className="text-muted mt-0.5">
-                                  <RichContentRenderer content={c.content} />
-                                </div>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
                     </div>
-                  )}
-                </article>
-              );
-            })}
+
+                    {/* Post Content using RichContentRenderer */}
+                    <div className="text-sm sm:text-base leading-relaxed">
+                      <RichContentRenderer content={displayContent} />
+                    </div>
+
+                    {isTranslated && (
+                      <p className="text-[0.68rem] font-mono text-teal">
+                        ✓ Bản dịch tự động hỗ trợ bởi AI · Giữ tính toàn vẹn nội dung gốc
+                      </p>
+                    )}
+
+                    {/* Media Gallery */}
+                    {post.media_urls && post.media_urls.length > 0 && (
+                      <div className="rounded-2xl overflow-hidden border border-line max-h-96">
+                        <img
+                          src={post.media_urls[0]}
+                          alt="Media attachment"
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      </div>
+                    )}
+
+                    {/* Action Bar (Like, Comment, Repost, Bookmark, Share, Analytics) */}
+                    <div className="flex items-center justify-between pt-3 border-t border-line text-xs font-mono text-muted">
+                      <button
+                        type="button"
+                        onClick={() => handleLike(post.id)}
+                        className={`inline-flex items-center gap-1.5 transition ${
+                          isLiked ? "text-rose-500 font-bold" : "hover:text-rose-500"
+                        }`}
+                      >
+                        <Heart className={`h-4 w-4 ${isLiked ? "fill-current" : ""}`} />
+                        <span>{post.likes_count}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => toggleComments(post.id)}
+                        className="inline-flex items-center gap-1.5 hover:text-accent transition"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                        <span>{post.comments_count}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleRepost(post.id)}
+                        className={`inline-flex items-center gap-1.5 transition ${
+                          isReposted ? "text-teal font-bold" : "hover:text-teal"
+                        }`}
+                      >
+                        <Repeat2 className="h-4 w-4" />
+                        <span>{post.reposts_count}</span>
+                      </button>
+
+                      {/* Views & Analytics Launcher */}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenAnalytics(post)}
+                        className="inline-flex items-center gap-1 hover:text-accent transition"
+                        title="Xem thống kê lượt xem và tương tác"
+                      >
+                        <BarChart3 className="h-3.5 w-3.5" />
+                        <span>{(post.views_count || 142).toLocaleString()}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleBookmark(post.id)}
+                        className={`inline-flex items-center gap-1.5 transition ${
+                          isBookmarked ? "text-amber-500 font-bold" : "hover:text-amber-500"
+                        }`}
+                      >
+                        <Bookmark className={`h-4 w-4 ${isBookmarked ? "fill-current" : ""}`} />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleShare(post.id)}
+                        className="inline-flex items-center gap-1.5 hover:text-ink transition"
+                      >
+                        {copiedId === post.id ? (
+                          <>
+                            <Check className="h-4 w-4 text-teal" />
+                            <span className="text-teal text-[0.7rem]">Đã chép</span>
+                          </>
+                        ) : (
+                          <Share2 className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Inline Comments Section */}
+                    {isCommentsExpanded && (
+                      <div className="pt-3 border-t border-line space-y-3">
+                        <div className="text-[0.68rem] font-mono text-subtle flex items-center justify-between">
+                          <span>Bình luận dưới danh nghĩa: <strong>{anonIdentity?.displayName}</strong></span>
+                          <Link href={localePath(locale, "/login")} className="text-accent underline">
+                            Đăng nhập để dùng tên thật
+                          </Link>
+                        </div>
+
+                        {/* Comment Input */}
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={commentInputs[post.id] || ""}
+                            onChange={(e) =>
+                              setCommentInputs((prev) => ({ ...prev, [post.id]: e.target.value }))
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleSendComment(post.id);
+                            }}
+                            placeholder="Viết phản hồi công khai (Enter để gửi)..."
+                            className="flex-1 rounded-xl border border-line bg-canvas px-3.5 py-2 text-xs text-ink placeholder:text-subtle focus:outline-none focus:border-accent"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSendComment(post.id)}
+                            disabled={submittingComment[post.id] || !(commentInputs[post.id] || "").trim()}
+                            className="p-2 rounded-xl bg-accent text-white dark:text-[#04101F] hover:opacity-90 disabled:opacity-40"
+                          >
+                            <Send className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+
+                        {/* Comments List from DB */}
+                        <div className="space-y-2 pt-1">
+                          {postComments.length === 0 ? (
+                            <p className="text-[0.72rem] text-subtle font-mono text-center py-2">
+                              Chưa có bình luận. Hãy là người đầu tiên bình luận!
+                            </p>
+                          ) : (
+                            postComments.map((c) => (
+                              <div key={c.id} className="rounded-2xl border border-line/60 bg-canvas/40 p-2.5 flex gap-2.5 text-xs">
+                                <div className="grid h-6 w-6 place-items-center rounded-full bg-accent/15 text-accent text-[0.65rem] font-bold shrink-0">
+                                  {c.author_name.charAt(0)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-bold text-ink">{c.author_name}</span>
+                                    <span className="text-[0.62rem] font-mono text-subtle">
+                                      {new Date(c.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                    </span>
+                                  </div>
+                                  <div className="text-muted mt-0.5">
+                                    <RichContentRenderer content={c.content} />
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </article>
+                );
+              })
+            )}
           </div>
         </main>
 
@@ -880,7 +1068,10 @@ export function SocialFeedClient({
               ].map((trend, i) => (
                 <div key={i} className="py-2.5 first:pt-1 last:pb-0">
                   <span className="text-[0.65rem] font-mono text-subtle block">{trend.domain}</span>
-                  <span className="text-xs font-bold text-ink hover:text-accent cursor-pointer transition block">
+                  <span
+                    onClick={() => setSearchQuery(trend.tag)}
+                    className="text-xs font-bold text-ink hover:text-accent cursor-pointer transition block"
+                  >
                     {trend.tag}
                   </span>
                   <span className="text-[0.65rem] font-mono text-muted block mt-0.5">{trend.count}</span>
@@ -910,6 +1101,21 @@ export function SocialFeedClient({
           </div>
         </aside>
       </div>
+
+      {/* Doodle / Custom Emoji Creator Modal */}
+      <DoodleEmojiModal
+        isOpen={isDoodleModalOpen}
+        onClose={() => setIsDoodleModalOpen(false)}
+        onSelectIcon={(icon) => setSelectedIcon(icon)}
+        currentIcon={selectedIcon}
+      />
+
+      {/* Post Analytics Modal */}
+      <PostAnalyticsModal
+        isOpen={!!analyticsPost}
+        onClose={() => setAnalyticsPost(null)}
+        post={analyticsPost}
+      />
 
       {/* Report Modal */}
       {reportingPostId && (

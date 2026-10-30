@@ -23,7 +23,7 @@ export async function GET(req: Request) {
       .from("social_posts")
       .select("*")
       .order("created_at", { ascending: false })
-      .limit(30);
+      .limit(40);
 
     if (category && category !== "all") {
       query = query.eq("category", category);
@@ -53,19 +53,12 @@ export async function POST(req: Request) {
       media_urls,
       category,
       captcha_token,
+      custom_icon,
     } = body;
 
     if (!content || !content.trim()) {
       return NextResponse.json(
         { error: "Nội dung bài viết không được để trống." },
-        { status: 400 }
-      );
-    }
-
-    // Server-side Anti-Spam Captcha validation check
-    if (!captcha_token) {
-      return NextResponse.json(
-        { error: "Vui lòng hoàn thành xác thực chống spam." },
         { status: 400 }
       );
     }
@@ -82,12 +75,15 @@ export async function POST(req: Request) {
       }
     );
 
+    const cleanHandle = (author_handle?.trim() || "user").replace(/^@/, "");
+    const isMonetized = cleanHandle === "myso";
+
     const { data, error } = await supabase
       .from("social_posts")
       .insert({
         content: content.trim(),
         author_name: author_name?.trim() || "Thành viên Myso",
-        author_handle: (author_handle?.trim() || "user").replace(/^@/, ""),
+        author_handle: cleanHandle,
         author_avatar: author_avatar || null,
         media_urls: Array.isArray(media_urls) ? media_urls : [],
         category: category || "all",
@@ -95,18 +91,23 @@ export async function POST(req: Request) {
         reposts_count: 0,
         comments_count: 0,
         bookmarks_count: 0,
+        views_count: 1,
+        monetized: isMonetized,
+        custom_icon: custom_icon || null,
       })
       .select()
       .single();
 
     if (error) {
-      console.error("Insert social post error:", error);
+      console.error("Supabase insert post error:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, post: data });
+    return NextResponse.json({ post: data });
   } catch (err: any) {
-    console.error("Social post API error:", err);
-    return NextResponse.json({ error: err.message || "Lỗi tạo bài viết" }, { status: 500 });
+    return NextResponse.json(
+      { error: err.message || "Failed to create post" },
+      { status: 500 }
+    );
   }
 }

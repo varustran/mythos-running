@@ -134,7 +134,7 @@ export default async function BlogPostPage({
         </Link>
       </div>
 
-      {/* Interactive Reddit/Voz Discussion Thread */}
+      {/* Interactive Myso Discussion Thread */}
       <DiscussionThread
         postSlug={post.slug}
         postTitle={post.title}

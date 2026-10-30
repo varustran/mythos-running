@@ -172,7 +172,7 @@ export function DiscussionThread({
 
   return (
     <section id="comments" className="mt-12 pt-8 border-t border-line">
-      {/* Top Post Action Bar (Reddit/Voz style) */}
+      {/* Top Post Action Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line bg-surface p-4 mb-8 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="flex items-center rounded-xl bg-canvas border border-line p-1">

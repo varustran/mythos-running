@@ -186,7 +186,7 @@ export function CommunityFeed({
                 key={post.id}
                 className="group rounded-2xl border border-line bg-surface hover:border-accent/50 transition-all p-4 sm:p-5 flex gap-4 shadow-sm"
               >
-                {/* Left Voting Column (Reddit/Voz style) */}
+                {/* Left Community Voting Column */}
                 <div className="flex flex-col items-center justify-start pt-1 gap-1 text-muted">
                   <button
                     onClick={() => handleVote(post.slug, 1)}

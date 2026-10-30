@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     locale,
     path: "blog",
     title: titles[locale as Locale] || titles.en,
-    description: "Open multi-domain discussion forum and publication network inspired by Reddit and Voz, featuring transparent revenue sharing.",
+    description: "Open multi-domain discussion forum and publication network, featuring transparent creator rewards and community knowledge exchange.",
   });
 }
 
@@ -44,7 +44,7 @@ export default async function BlogHubPage({ params }: { params: Promise<{ locale
           </h1>
           <p className="mt-3 text-sm sm:text-base text-muted leading-relaxed max-w-2xl mx-auto">
             {locale === "vi"
-              ? "Không gian thảo luận mở, chia sẻ kinh nghiệm và tranh luận đa lĩnh vực theo phong cách Reddit & Voz. Viết bài, thu hút lượt đọc và nhận chia sẻ doanh thu thực tế."
+              ? "Không gian thảo luận mở, chia sẻ kinh nghiệm và tranh luận đa lĩnh vực. Viết bài, thu hút lượt đọc và tham gia mạng lưới sáng tạo nội dung của Myso."
               : "Unrestricted multi-domain discussion and publication network. Engage in open debates, share practical knowledge, and earn transparent creator rewards."}
           </p>
 
@@ -68,7 +68,7 @@ export default async function BlogHubPage({ params }: { params: Promise<{ locale
         </div>
       </section>
 
-      {/* Main Reddit/Voz Community Feed Section */}
+      {/* Main Community Discussion Feed Section */}
       <section className="container-page py-10 sm:py-14">
         <CommunityFeed initialPosts={starterCommunityPosts} locale={locale} />
       </section>

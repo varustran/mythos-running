@@ -27,8 +27,8 @@ export default async function LegalFaqPage({ params }: { params: Promise<{ local
       a: "Myso là mạng lưới mở kết hợp giữa mạng xã hội tương tác thời gian thực (như X, TikTok), bách khoa tri thức mở có kiểm chứng (như Wikipedia), công cụ tiện ích bảo mật (Myso Notes) và kênh trò chuyện mã hóa đầu cuối. Người dùng có toàn quyền sở hữu nội dung và phát triển thương hiệu cá nhân.",
     },
     {
-      q: "Tính năng kiếm tiền (Creator Monetization) hiện tại đang ở trạng thái nào?",
-      a: "Tính năng kiếm tiền hiện tại đang trong giai đoạn hoàn thiện tài liệu, cổng kết nối đối tác quảng cáo và cơ chế thanh toán tự động minh bạch (Tạm thời chưa mở cổng rút tiền). Trong giai đoạn này, các bài viết của bạn sẽ được ghi nhận lượt xem thực và điểm tín nhiệm tác giả (Author Reputation Score) để được ưu tiên kích hoạt và phân bổ doanh thu ngay khi tính năng chính thức đi vào vận hành.",
+      q: "Chính sách kiếm tiền (Creator Monetization) của Myso hoạt động như thế nào?",
+      a: "Những tài khoản và bài viết được hệ thống duyệt bật tính năng kiếm tiền sẽ hiển thị huy hiệu '✨ Kiếm Tiền' chính thức. Doanh thu được ghi nhận dựa trên lưu lượng tiếp cận thực tế, chất lượng nội dung nguyên bản và mức độ tương tác tích cực của độc giả. Nhằm bảo đảm tính công bằng, phòng chống gian lận và click ảo, Myso bảo mật thuật toán phân bổ doanh thu nội bộ và không công bố chi tiết công thức kỹ thuật.",
     },
     {
       q: "Làm thế nào để đạt điều kiện tham gia Quỹ Tác Giả Myso?",
@@ -92,7 +92,7 @@ export default async function LegalFaqPage({ params }: { params: Promise<{ local
           href={localePath(locale, "/monetization")}
           className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-accent px-4 py-2.5 text-xs font-semibold text-white dark:text-[#04101F] hover:opacity-90 transition whitespace-nowrap shadow-sm"
         >
-          <span>Xem Tài Liệu RPM</span>
+          <span>Chính Sách Đối Tác</span>
         </Link>
       </div>
 
