@@ -275,24 +275,24 @@ export function GameCanvas({ locale, initialChapterId = 1 }: { locale: Locale; i
         {/* 3. Dialogue Overlay */}
         {activeDialogue ? (
           <div className="absolute inset-0 z-30 flex items-end p-4 sm:p-6 bg-canvas/40 backdrop-blur-sm animate-fade-in">
-            <div className="w-full rounded-2xl border border-teal/40 bg-[#081220]/95 p-5 shadow-2xl">
-              <div className="flex items-center justify-between border-b border-line pb-2 mb-3">
+            <div className="w-full rounded-2xl border border-teal/40 bg-[#0B1528] p-5 shadow-2xl text-slate-100">
+              <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-3">
                 <div className="flex items-center gap-2">
-                  <span className="font-display font-semibold text-teal text-sm">
+                  <span className="font-display font-semibold text-teal text-base">
                     {activeDialogue.speaker}
                   </span>
-                  <span className="font-mono text-[0.65rem] text-subtle uppercase tracking-wider">
+                  <span className="font-mono text-xs text-white/60 uppercase tracking-wider">
                     ({activeDialogue.speakerRole[locale]})
                   </span>
                 </div>
               </div>
 
-              <p className="font-sans text-sm sm:text-base leading-relaxed text-ink/90">
+              <p className="font-sans text-sm sm:text-base leading-relaxed text-white/95">
                 {activeDialogue.text[locale]}
               </p>
 
               {activeDialogue.choices && activeDialogue.choices.length > 0 ? (
-                <div className="mt-4 flex flex-wrap gap-2 pt-2 border-t border-line/60">
+                <div className="mt-4 flex flex-wrap gap-2 pt-2 border-t border-white/10">
                   {activeDialogue.choices.map((choice, idx) => (
                     <button
                       key={idx}
