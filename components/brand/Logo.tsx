@@ -18,8 +18,8 @@ export function Logo({ className, href = "/" }: { className?: string; href?: str
         </svg>
       </span>
       <span className="flex flex-col leading-none">
-        <span className="font-display text-[0.95rem] font-semibold tracking-tight text-ink">Mythos</span>
-        <span className="font-mono text-[0.55rem] uppercase tracking-[0.32em] text-subtle">Running</span>
+        <span className="font-display text-[1.05rem] font-bold tracking-tight text-ink">Myso</span>
+        <span className="font-mono text-[0.55rem] uppercase tracking-[0.24em] text-accent font-semibold">ECOSYSTEM</span>
       </span>
     </Link>
   );

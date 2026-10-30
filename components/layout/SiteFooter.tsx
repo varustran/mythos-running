@@ -12,17 +12,17 @@ export function SiteFooter({ locale }: { locale: Locale }) {
   const legal = getT(locale, "legal");
 
   const explore = [
-    { label: nav("academy"), href: "/academy" },
+    { label: nav("wiki"), href: "/wiki" },
+    { label: nav("blog"), href: "/blog" },
+    { label: nav("notes"), href: "/notes" },
     { label: nav("tools"), href: "/tools" },
-    { label: nav("events"), href: "/events" },
-    { label: nav("routes"), href: "/routes" },
-    { label: nav("gear"), href: "/gear" },
+    { label: nav("arcade"), href: "/arcade" },
   ];
   const company = [
+    { label: nav("monetization"), href: "/monetization" },
+    { label: nav("community"), href: "/community" },
     { label: nav("about"), href: "/about" },
     { label: nav("contact"), href: "/contact" },
-    { label: nav("labs"), href: "/labs" },
-    { label: nav("community"), href: "/community" },
   ];
   const legalLinks = [
     { label: legal("privacyTitle"), href: "/privacy" },

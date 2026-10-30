@@ -1,58 +1,56 @@
 export const siteConfig = {
-  name: "Mythos Running",
-  legalName: "Mythos Running",
+  name: "Myso",
+  legalName: "Myso Network",
+  tagline: "Open Encyclopedia · Creator Network · Tools & Games",
   description:
-    "A digital ecosystem for runners: training knowledge, working tools, community, events, routes and research from Hue, Vietnam.",
+    "Myso is a multi-domain open knowledge base, creator publication network, suite of working tools, and browser game studio with decentralized peer verification.",
   url: process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://mythos-running.vercel.app",
   locale: "vi",
-  location: "Hue, Vietnam",
   github: "https://github.com/varustran/mythos-running",
   social: [
-    { label: "Instagram", href: "https://www.instagram.com/" },
-    { label: "Strava", href: "https://www.strava.com/" },
-    { label: "YouTube", href: "https://www.youtube.com/" },
+    { label: "X (Twitter)", href: "https://x.com/" },
+    { label: "GitHub", href: "https://github.com/varustran/mythos-running" },
+    { label: "Discord", href: "https://discord.com/" },
   ],
 };
 
 export const navItems = [
-  { key: "academy", href: "/academy" },
+  { key: "wiki", href: "/wiki" },
+  { key: "blog", href: "/blog" },
+  { key: "notes", href: "/notes" },
   { key: "tools", href: "/tools" },
-  { key: "events", href: "/events" },
-  { key: "routes", href: "/routes" },
-  { key: "gear", href: "/gear" },
+  { key: "arcade", href: "/arcade" },
+  { key: "monetization", href: "/monetization" },
   { key: "community", href: "/community" },
-  { key: "labs", href: "/labs" },
-  { key: "game", href: "/game" },
 ] as const;
 
 export const footerGroups = [
   {
     titleKey: "explore",
     links: [
-      { label: "Academy", href: "/academy" },
-      { label: "Tools", href: "/tools" },
-      { label: "Events", href: "/events" },
-      { label: "Routes", href: "/routes" },
-      { label: "Gear", href: "/gear" },
-      { label: "The Last Route", href: "/game" },
+      { label: "Bách khoa Myso Wiki", href: "/wiki" },
+      { label: "Mạng Blog & Tác giả", href: "/blog" },
+      { label: "Ghi chú nhanh (Myso Notes)", href: "/notes" },
+      { label: "Công cụ đa năng", href: "/tools" },
+      { label: "Myso Arcade (Games)", href: "/arcade" },
     ],
   },
   {
-    titleKey: "company",
+    titleKey: "creator",
     links: [
-      { label: "About", href: "/about" },
-      { label: "Contact", href: "/contact" },
-      { label: "Mythos Labs", href: "/labs" },
-      { label: "Community", href: "/community" },
+      { label: "Kiếm tiền từ bài viết", href: "/monetization" },
+      { label: "Đăng bài mới", href: "/blog/create" },
+      { label: "Hàng đợi kiểm duyệt 2-Peer", href: "/wiki/review" },
+      { label: "Cộng đồng tác giả", href: "/community" },
     ],
   },
   {
     titleKey: "legal",
     links: [
-      { label: "Privacy", href: "/privacy" },
-      { label: "Terms", href: "/terms" },
-      { label: "Editorial policy", href: "/editorial-policy" },
-      { label: "Disclaimer", href: "/disclaimer" },
+      { label: "Miễn trừ trách nhiệm", href: "/disclaimer" },
+      { label: "Chính sách kiểm duyệt", href: "/editorial-policy" },
+      { label: "Điều khoản sử dụng", href: "/terms" },
+      { label: "Bảo mật & Quyền riêng tư", href: "/privacy" },
     ],
   },
 ];

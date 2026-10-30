@@ -79,18 +79,24 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             </h1>
             <p className="mt-6 max-w-xl text-base leading-relaxed text-muted sm:text-lg">{t("heroDesc")}</p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <ButtonLink href={localePath(locale, "/tools")} size="lg">
+              <ButtonLink href={localePath(locale, "/wiki")} size="lg">
                 {t("heroCtaPrimary")}
                 <ArrowRight className="h-4 w-4" />
               </ButtonLink>
-              <ButtonLink href={localePath(locale, "/academy")} variant="secondary" size="lg">
+              <ButtonLink href={localePath(locale, "/blog")} variant="secondary" size="lg">
                 {t("heroCtaSecondary")}
               </ButtonLink>
+              <Link
+                href={localePath(locale, "/notes")}
+                className="inline-flex items-center gap-1.5 rounded-full border border-teal/40 bg-teal/10 px-4 py-2.5 text-xs font-mono font-semibold text-teal hover:bg-teal hover:text-black transition"
+              >
+                Ghi chú nhanh Note2s »
+              </Link>
             </div>
             <dl className="mt-10 grid max-w-lg grid-cols-3 gap-6 border-t border-line pt-6">
               {[
+                { value: "10,000+", label: t("heroStatArticles") },
                 { value: tools.length, label: t("heroStatTools") },
-                { value: 5, label: t("heroStatArticles") },
                 { value: 4, label: t("heroStatLangs") },
               ].map((stat) => (
                 <div key={stat.label}>
@@ -102,22 +108,22 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           </div>
 
           <div className="relative animate-fade-up [animation-delay:120ms]">
-            <div className="card relative overflow-hidden p-5 sm:p-6">
+            <div className="card relative overflow-hidden p-5 sm:p-6 shadow-2xl border border-line">
               <div className="flex items-center justify-between">
-                <span className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-subtle">Mythos / session 042</span>
-                <Badge tone="outline">{common("sampleData")}</Badge>
+                <span className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-subtle">Myso / live telemetry</span>
+                <Badge tone="outline">Global Active</Badge>
               </div>
               <div className="mt-5 flex items-end justify-between">
                 <div>
-                  <p className="font-display text-4xl font-semibold tracking-tight text-ink">12.4<span className="ml-1 text-lg text-subtle">km</span></p>
-                  <p className="mt-1 font-mono text-[0.65rem] uppercase tracking-[0.16em] text-subtle">Huong River · 05:32</p>
+                  <p className="font-display text-4xl font-semibold tracking-tight text-ink">Myso<span className="ml-1 text-lg text-accent">Network</span></p>
+                  <p className="mt-1 font-mono text-[0.65rem] uppercase tracking-[0.16em] text-subtle">Open Encyclopedia · 2-Peer Verified</p>
                 </div>
-                <span className="rounded-full bg-teal/10 px-2.5 py-1 font-mono text-[0.62rem] text-teal">5:12 /km</span>
+                <span className="rounded-full bg-teal/10 px-2.5 py-1 font-mono text-[0.62rem] text-teal">Wikipedia Linked</span>
               </div>
               <div className="relative mt-4 overflow-hidden rounded-xl border border-line bg-elevated/70">
                 <Artwork seed={1} image="/images/hero-running.jpg" className="aspect-[16/9] w-full" />
-                <span className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-canvas/80 px-2.5 py-1 font-mono text-[0.58rem] uppercase tracking-[0.14em] text-ink backdrop-blur">
-                  <MapPin className="h-3 w-3 text-accent" /> Hue, Vietnam
+                <span className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-canvas/90 px-2.5 py-1 font-mono text-[0.58rem] uppercase tracking-[0.14em] text-ink backdrop-blur">
+                  <Sparkles className="h-3 w-3 text-accent" /> Decentralized Knowledge
                 </span>
               </div>
               <div className="mt-5 grid grid-cols-3 gap-3">
@@ -269,15 +275,15 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           <div className="max-w-xl">
             <span className="inline-flex items-center gap-2 rounded-full border border-teal/40 bg-teal/10 px-3 py-1 font-mono text-xs font-medium text-teal">
               <Sparkles className="h-3.5 w-3.5 animate-spin" style={{ animationDuration: "5s" }} />
-              MYTHOS ORIGINAL GAME · CHƠI TRÊN WEB
+              MYSO ARCADE STUDIO · CHƠI TRÊN WEB
             </span>
             <h2 className="mt-4 font-display text-3xl sm:text-5xl font-bold tracking-tight text-white leading-tight">
               {locale === "vi" ? "Mythos: Dấu Chân Cuối Cùng" : "Mythos: The Last Route"}
             </h2>
             <p className="mt-4 text-sm sm:text-base leading-relaxed text-[#A7B4C7]">
               {locale === "vi"
-                ? "Tựa game phiêu lưu tường thuật 8 chương lấy bối cảnh Cố Đô Huế. Chạy qua những cung đường ẩn giấu, thu thập mảnh ký ức và giải mã bí mật trong đêm."
-                : "An 8-chapter narrative running adventure through mysterious phantom avenues in ancient Hue. Run, collect memory shards, and uncover the city's lost routes."}
+                ? "Tựa game phiêu lưu tường thuật 8 chương lấy bối cảnh Cố Đô huyền bí. Chạy qua những cung đường ẩn giấu, thu thập mảnh ký ức và giải mã bí mật trong đêm."
+                : "An 8-chapter narrative running adventure through mysterious phantom avenues. Run, collect memory shards, and uncover the city's lost routes."}
             </p>
             <div className="mt-6 flex flex-wrap items-center gap-4">
               <Link
@@ -288,10 +294,10 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                 {locale === "vi" ? "Chơi Ngay (Miễn Phí)" : "Play Online (Free)"}
               </Link>
               <Link
-                href={localePath(locale, "/game")}
+                href={localePath(locale, "/arcade")}
                 className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-5 py-3 text-sm font-medium text-white hover:border-teal transition backdrop-blur"
               >
-                {locale === "vi" ? "Xem 8 Chương Cốt Truyện" : "Explore 8 Chapters"}
+                {locale === "vi" ? "Phòng Game Myso Arcade" : "Myso Arcade Hub"}
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
@@ -317,8 +323,8 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         <div className="container-page py-16 sm:py-20">
           <SectionHeading
             eyebrow="06 — Community Moments"
-            title={locale === "vi" ? "Khoảnh khắc Mythos Running tại Huế" : locale === "zh-CN" ? "Mythos 在顺化的跑步瞬间" : locale === "ja" ? "フエでのMythosランニングの瞬間" : "Mythos Running Moments in Hue"}
-            description={locale === "vi" ? "Những bước chạy thực tế qua từng con đường cổ kính, bờ sông Hương và các cung đồi thơ mộng của Cố đô." : locale === "zh-CN" ? "沿着古城街道、香江河畔与顺化秀美山丘的真实奔跑。" : locale === "ja" ? "古都の街並み、フォーン川沿い、そして緑豊かな丘陵を駆け抜ける実際のランニングシーン。" : "Real community strides through ancient citadel avenues, Huong riverbanks, and scenic hills."}
+            title={locale === "vi" ? "Khoảnh khắc cộng đồng Myso" : locale === "zh-CN" ? "Myso 社区精彩瞬间" : locale === "ja" ? "Myso コミュニティの瞬間" : "Myso Community Moments"}
+            description={locale === "vi" ? "Những bước chạy, bài viết và hoạt động kết nối thực tế từ các thành viên trong mạng lưới." : locale === "zh-CN" ? "来自网络成员的真实奔跑、文章与活动连接。" : locale === "ja" ? "コミュニティメンバーによる実際のランニングや活動シーン。" : "Real community strides, articles, and active connections across the network."}
             action={{ label: common("viewAll"), href: localePath(locale, "/community") }}
           />
           <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">

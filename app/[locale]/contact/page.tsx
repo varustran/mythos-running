@@ -25,7 +25,7 @@ export default async function ContactPage({ params }: { params: Promise<{ locale
 
   return (
     <>
-      <PageHero eyebrow="Mythos Contact" title={t("contactTitle")} description={t("contactDesc")} />
+      <PageHero eyebrow="Myso Contact" title={t("contactTitle")} description={t("contactDesc")} />
       <div className="container-page py-12 sm:py-16">
         <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
           <ContactForm locale={locale} />
@@ -33,7 +33,7 @@ export default async function ContactPage({ params }: { params: Promise<{ locale
             <div className="card p-6">
               <MapPin className="h-5 w-5 text-teal" />
               <p className="mt-3 font-mono text-[0.62rem] uppercase tracking-[0.16em] text-subtle">{t("address")}</p>
-              <p className="mt-2 text-sm text-ink">{siteConfig.location}</p>
+              <p className="mt-2 text-sm text-ink">Myso Open Network · Decentralized Global</p>
               <p className="mt-4 text-xs leading-relaxed text-muted">{t("contactNote")}</p>
             </div>
             <div className="card p-6">

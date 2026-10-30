@@ -206,66 +206,66 @@ Mythos Running は明瞭さ、誠実さ、検証可能性を重視します。�
   disclaimer: {
     updatedAt: "2026-10-30",
     body: {
-      vi: `## Nội dung giáo dục
+      vi: `## Tuyên bố miễn trừ trách nhiệm nội dung mở và cộng đồng
 
-Thông tin trên Mythos Running nhằm hỗ trợ học tập và ra quyết định có hiểu biết. Đây không phải dịch vụ y tế, chẩn đoán hoặc điều trị.
+Myso là nền tảng tri thức mở, mạng lưới xuất bản tự do và công cụ chia sẻ cộng đồng (bao gồm Myso Wiki, Myso Blog, Myso Notes). Nội dung được đóng góp bởi người dùng ẩn danh hoặc có tài khoản và được kiểm duyệt qua cơ chế 2-Peer Review độc lập.
 
-## Sức khỏe của bạn
+Myso không đảm bảo tính chính xác tuyệt đối, đầy đủ hoặc cập nhật kịp thời của mọi bài viết, nguồn trích dẫn hay công cụ. Độc giả hoàn toàn tự chịu trách nhiệm khi tham khảo và áp dụng các thông tin trên hệ thống.
 
-Trước khi bắt đầu hoặc thay đổi chương trình tập luyện, hãy tham khảo ý kiến chuyên gia y tế, đặc biệt nếu bạn có bệnh nền, chấn thương hoặc đang mang thai. Dừng tập và tìm trợ giúp nếu có đau ngực, chóng mặt hoặc khó thở bất thường.
+## Miễn trừ y tế, thể thao và sinh lý học
 
-## Ước tính và dữ liệu
+Mọi tài liệu về thể thao, chạy bộ, dinh dưỡng và sinh lý học nhằm mục đích giáo dục và nâng cao hiểu biết khoa học. Đây không phải lời khuyên y tế hay chỉ định điều trị. Hãy tham vấn bác sĩ hoặc huấn luyện viên có chứng chỉ trước khi bắt đầu hoặc thay đổi cường độ vận động.
 
-Các công cụ dùng công thức đơn giản hóa. Kết quả có thể khác với thiết bị, phòng thí nghiệm hoặc điều kiện thực tế. Không dùng kết quả để tự chẩn đoán.
+## Miễn trừ công cụ và ước tính dữ liệu
 
-## Liên kết bên ngoài
+Các công cụ máy tính hoạt động dựa trên các thuật toán lý thuyết và công thức toán học phổ quát (Riegel, Karvonen, METs...). Kết quả thực tế có thể dao động tùy cơ địa và điều kiện môi trường.
 
-Chúng tôi có thể liên kết đến trang của bên thứ ba. Mythos Running không kiểm soát và không chịu trách nhiệm về nội dung hoặc chính sách của các trang đó.`,
-      en: `## Educational content
+## Liên kết bên ngoài và nguồn mở Wikipedia
 
-Information on Mythos Running supports learning and informed decisions. It is not a medical service, diagnosis or treatment.
+Myso tích hợp dữ liệu mở từ Wikipedia và các nguồn dẫn bên thứ ba. Chúng tôi không sở hữu, kiểm soát hoặc chịu trách nhiệm về chính sách bản quyền và nội dung tại các trang đích bên ngoài.`,
+      en: `## Open Knowledge & Community Content Disclaimer
 
-## Your health
+Myso is an open knowledge platform, creator publishing network, and utility ecosystem (including Myso Wiki, Myso Blog, Myso Notes). Articles are contributed by community members and verified through independent 2-peer IP moderation.
 
-Consult a healthcare professional before starting or changing a training programme, especially if you have a medical condition, injury or are pregnant. Stop and seek help if you experience chest pain, dizziness or unusual shortness of breath.
+Myso does not warrant the absolute accuracy, completeness, or timeliness of user-contributed content or external references. Readers assume full responsibility when applying any information found on the platform.
 
-## Estimates and data
+## Medical, Sports & Physiology Disclaimer
 
-Tools use simplified formulas. Results may differ from devices, laboratory testing or real-world conditions. Do not use results to self-diagnose.
+All training, nutritional, and physiological content is for educational purposes only and does not constitute medical advice or diagnosis. Always consult certified medical or coaching professionals before undertaking vigorous athletic regimens.
 
-## External links
+## Tools & Calculation Estimates
 
-We may link to third-party sites. Mythos Running does not control and is not responsible for their content or policies.`,
-      "zh-CN": `## 教育内容
+Calculators utilize theoretical models and empirical formulas. Actual physical performance may differ significantly based on individual physiology and ambient conditions.
 
-Mythos Running 上的信息用于支持学习与知情决策，不构成医疗服务、诊断或治疗。
+## External Links & Wikipedia Federation
 
-## 你的健康
+Myso federates live references from Wikipedia and external citations. We do not control and bear no liability for third-party websites or policies.`,
+      "zh-CN": `## 开放知识与社区内容免责声明
 
-在开始或改变训练计划前，请咨询医疗专业人士，尤其是如果你有疾病、受伤或怀孕。如出现胸痛、头晕或异常气短，请停止运动并寻求帮助。
+Myso 是一个开放知识平台与创作者出版网络（包括 Myso 百科、Myso 博客与 Myso 便签）。内容由社区用户自由贡献，并通过 2-Peer 对等审核机制进行核查。
 
-## 估算与数据
+Myso 不保证内容的绝对准确性与时效性。用户在参考与应用本平台信息时需自行承担全部责任。
 
-工具使用简化公式。结果可能与设备、实验室测试或实际情况不同。请勿用结果进行自我诊断。
+## 医疗、运动与生理免责
 
-## 外部链接
+所有训练、营养与生理学文章仅用于科学普及与教育目的，不构成医疗诊断或专业医嘱。
 
-我们可能链接到第三方网站。Mythos Running 不控制也不对其内容或政策负责。`,
-      ja: `## 教育コンテンツ
+## 外部链接与维基百科引用
 
-Mythos Running の情報は学習と合理的な判断を支援するものです。医療サービス、診断、治療ではありません。
+Myso 引用维基百科与外部参考资料，我们不对第三方站点的政策或内容负责。`,
+      ja: `## オープン知識およびコミュニティコンテンツに関する免責事項
 
-## 健康について
+Myso はオープンな知識プラットフォームおよびクリエイター出版ネットワーク（Myso 百科、ブログ、ノートを含む）です。記事はコミュニティメンバーによって投稿され、2-Peer 独立検証を通じて確認されます。
 
-トレーニングを開始・変更する前に、特に疾患、怪我、妊娠がある場合は医療専門家に相談してください。胸痛、めまい、異常な息切れがある場合は運動を中止し、助けを求めてください。
+Myso は掲載情報の完全性や正確性を保証するものではなく、利用に伴ういかなる損害についても責任を負いません。
 
-## 推定値とデータ
+## 医療・運動・生理学に関する免責
 
-ツールは簡略化された式を使用します。結果は機器、検査、実際の条件と異なる場合があります。自己診断に使用しないでください。
+すべてのトレーニングや生理学に関する記述は教育目的であり、医療アドバイスではありません。
 
-## 外部リンク
+## 外部リンクおよび Wikipedia 連携
 
-第三者サイトへのリンクを含む場合があります。Mythos Running はそれらの内容や方針を管理せず、責任を負いません。`,
+Myso は Wikipedia や外部ソースを参照していますが、第三者サイトの内容や方針について責任を負いません。`,
     },
   },
 };
