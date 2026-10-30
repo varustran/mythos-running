@@ -1,0 +1,155 @@
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/inter-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Sora";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("/fonts/sora-latin.woff2") format("woff2");
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: "Inter";
+  --font-display: "Sora";
+  --canvas: 247 249 252;
+  --surface: 255 255 255;
+  --elevated: 241 245 250;
+  --ink: 12 20 33;
+  --muted: 71 85 105;
+  --subtle: 104 120 140;
+  --line: 219 227 237;
+  --accent: 24 105 226;
+  --accent-soft: 231 240 255;
+  --teal: 10 143 133;
+  color-scheme: light;
+}
+
+.dark {
+  --canvas: 8 13 22;
+  --surface: 16 24 39;
+  --elevated: 29 42 61;
+  --ink: 244 247 252;
+  --muted: 167 180 199;
+  --subtle: 119 134 155;
+  --line: 39 52 71;
+  --accent: 77 159 255;
+  --accent-soft: 20 40 64;
+  --teal: 54 214 208;
+  color-scheme: dark;
+}
+
+* {
+  border-color: rgb(var(--line));
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background-color: rgb(var(--canvas));
+  color: rgb(var(--ink));
+  font-family: var(--font-sans), "Inter", system-ui, -apple-system, "Segoe UI", "Noto Sans",
+    "Noto Sans JP", "Noto Sans SC", sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background-color: rgb(var(--accent) / 0.25);
+}
+
+:focus-visible {
+  outline: 2px solid rgb(var(--accent));
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-content px-5 sm:px-7 lg:px-10;
+  }
+
+  .eyebrow {
+    @apply font-mono text-[0.7rem] font-medium uppercase tracking-[0.22em] text-subtle;
+  }
+
+  .display-title {
+    @apply font-display font-semibold tracking-tightest text-ink;
+  }
+
+  .card {
+    @apply rounded-xl2 border border-line bg-surface shadow-card;
+  }
+
+  .card-hover {
+    @apply transition duration-300 hover:-translate-y-0.5 hover:shadow-lift;
+  }
+
+  .hairline {
+    @apply border-t border-line;
+  }
+
+  .link-underline {
+    @apply underline decoration-line decoration-1 underline-offset-4 transition hover:decoration-accent;
+  }
+
+  .prose-mythos {
+    @apply prose prose-slate max-w-none dark:prose-invert
+      prose-headings:font-display prose-headings:tracking-tight
+      prose-h2:mt-12 prose-h2:text-2xl prose-h3:text-xl
+      prose-p:leading-[1.85] prose-p:text-muted
+      prose-li:text-muted prose-li:leading-[1.75]
+      prose-strong:text-ink
+      prose-a:font-medium prose-a:text-accent prose-a:no-underline hover:prose-a:underline
+      prose-blockquote:border-l-accent prose-blockquote:bg-elevated/60 prose-blockquote:px-5 prose-blockquote:py-1 prose-blockquote:not-italic
+      prose-code:rounded prose-code:bg-elevated prose-code:px-1.5 prose-code:py-0.5 prose-code:text-ink prose-code:before:content-none prose-code:after:content-none;
+  }
+
+  .bg-grid {
+    background-image: linear-gradient(to right, rgb(var(--line) / 0.5) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(var(--line) / 0.5) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 20%, transparent 75%);
+  }
+
+  .bg-noise {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E");
+  }
+
+  .glow-orb {
+    background: radial-gradient(circle at center, rgb(var(--accent) / 0.28), transparent 68%);
+    filter: blur(30px);
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
