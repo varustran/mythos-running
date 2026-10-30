@@ -98,9 +98,12 @@ export const zhCN: Dictionary = {
     next: "下一页",
   },
   nav: {
+    feed: "动态",
+    chat: "加密聊天 🔒",
+    standards: "标准与法律",
     home: "首页",
     wiki: "Myso 百科",
-    blog: "文章与博客",
+    blog: "论坛与博客",
     notes: "即时便签",
     tools: "实用工具",
     arcade: "街机游戏",
@@ -121,7 +124,7 @@ export const zhCN: Dictionary = {
     search: "搜索",
   },
   home: {
-    eyebrow: "越南 · 顺化",
+    eyebrow: "MYSO OPEN ECOSYSTEM",
     heroTitle: "跑得更远，",
     heroHighlight: "更懂自己。",
     heroDesc: "Mythos Running 将训练知识、测量工具与越南跑者社区连接起来，让每一步都有依据。",

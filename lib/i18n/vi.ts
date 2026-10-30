@@ -98,8 +98,11 @@ export const vi = {
   },
   nav: {
     home: "Trang chủ",
+    feed: "Bảng tin",
+    chat: "Trò chuyện 🔒",
+    standards: "Tiêu chuẩn & Pháp lý",
     wiki: "Myso Wiki",
-    blog: "Bài viết & Blog",
+    blog: "Diễn đàn & Blog",
     notes: "Ghi chú nhanh",
     tools: "Công cụ",
     arcade: "Trò chơi Arcade",

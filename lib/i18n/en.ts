@@ -99,9 +99,12 @@ export const en: Dictionary = {
     next: "Next",
   },
   nav: {
+    feed: "Feed",
+    chat: "Chat 🔒",
+    standards: "Standards & Legal",
     home: "Home",
     wiki: "Myso Wiki",
-    blog: "Blog & Posts",
+    blog: "Forum & Blog",
     notes: "Instant Notes",
     tools: "Tools",
     arcade: "Arcade Games",

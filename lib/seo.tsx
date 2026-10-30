@@ -66,15 +66,11 @@ export function buildMetadata({
 export function organizationSchema() {
   return {
     "@context": "https://schema.org",
-    "@type": "SportsOrganization",
+    "@type": "Organization",
     name: siteConfig.name,
+    legalName: siteConfig.legalName,
     url: siteConfig.url,
     description: siteConfig.description,
-    address: {
-      "@type": "PostalAddress",
-      addressLocality: "Hue",
-      addressCountry: "VN",
-    },
     sameAs: siteConfig.social.map((s) => s.href),
   };
 }
@@ -88,7 +84,7 @@ export function websiteSchema(locale: Locale) {
     inLanguage: locale,
     potentialAction: {
       "@type": "SearchAction",
-      target: `${siteConfig.url}/${locale}/academy?q={search_term_string}`,
+      target: `${siteConfig.url}/${locale}/wiki?q={search_term_string}`,
       "query-input": "required name=search_term_string",
     },
   };

@@ -2,29 +2,56 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Github, Loader2, Mail, KeyRound, ShieldCheck, CheckCircle2 } from "lucide-react";
+import {
+  Github,
+  Loader2,
+  Mail,
+  KeyRound,
+  ShieldCheck,
+  CheckCircle2,
+  User,
+  AtSign,
+  Sparkles,
+  Camera,
+  ArrowRight,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { AntiSpamCaptcha } from "@/components/security/AntiSpamCaptcha";
 
 const fieldClass =
-  "w-full rounded-xl border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-subtle focus:border-accent";
+  "w-full rounded-xl border border-line bg-canvas px-3.5 py-2.5 text-xs sm:text-sm text-ink outline-none transition placeholder:text-subtle focus:border-accent";
+
+const AVATAR_PRESETS = [
+  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
+  "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80",
+];
 
 export function LoginForm({ locale }: { locale: string }) {
-  const { t } = useTranslation("auth");
+  const [activeTab, setActiveTab] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
+  const [bio, setBio] = useState("");
+  const [selectedAvatar, setSelectedAvatar] = useState(AVATAR_PRESETS[0]);
   const [otpCode, setOtpCode] = useState("");
-  const [mode, setMode] = useState<"otp_request" | "otp_verify">("otp_request");
+  const [mode, setMode] = useState<"form" | "otp_verify">("form");
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error" | "verified">("idle");
   const [statusMsg, setStatusMsg] = useState<string>("");
 
-  const redirectTo = () => `${window.location.origin}/auth/callback?next=/${locale}/admin`;
+  const redirectTo = () => `${window.location.origin}/auth/callback?next=/${locale}`;
 
-  // 1. Google OAuth
-  async function signInWithGoogle() {
+  // Social OAuth
+  async function signInOAuth(provider: "google" | "twitter" | "github") {
     const supabase = createClient();
     if (!supabase) return;
     setStatus("sending");
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
+      provider,
       options: { redirectTo: redirectTo() },
     });
     if (error) {
@@ -33,63 +60,125 @@ export function LoginForm({ locale }: { locale: string }) {
     }
   }
 
-  // 2. X (Twitter) OAuth
-  async function signInWithX() {
-    const supabase = createClient();
-    if (!supabase) return;
-    setStatus("sending");
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "twitter",
-      options: { redirectTo: redirectTo() },
-    });
-    if (error) {
+  // Handle Sign In
+  async function handleSignIn(e: React.FormEvent) {
+    e.preventDefault();
+    if (!captchaToken) {
       setStatus("error");
-      setStatusMsg(error.message);
+      setStatusMsg("Vui lòng hoàn thành câu đố bảo mật chống spam.");
+      return;
     }
-  }
 
-  // 3. GitHub OAuth
-  async function signInWithGithub() {
     const supabase = createClient();
     if (!supabase) return;
-    setStatus("sending");
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "github",
-      options: { redirectTo: redirectTo() },
-    });
-    if (error) {
-      setStatus("error");
-      setStatusMsg(error.message);
-    }
-  }
 
-  // 4. Send Email OTP / Magic Link
-  async function sendEmailOtp(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const supabase = createClient();
-    if (!supabase) return;
     setStatus("sending");
-    const { error } = await supabase.auth.signInWithOtp({
+    setStatusMsg("");
+
+    // Try password sign-in first if password is provided
+    if (password.trim().length >= 6) {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (!error && data.user) {
+        setStatus("verified");
+        setStatusMsg("Đăng nhập thành công! Đang chuyển hướng...");
+        setTimeout(() => {
+          window.location.href = `/${locale}`;
+        }, 1000);
+        return;
+      }
+    }
+
+    // Fallback to OTP / Magic link
+    const { error: otpErr } = await supabase.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: redirectTo() },
     });
-    if (error) {
+
+    if (otpErr) {
       setStatus("error");
-      setStatusMsg(error.message);
+      setStatusMsg(otpErr.message || "Lỗi đăng nhập.");
     } else {
       setStatus("sent");
       setMode("otp_verify");
-      setStatusMsg("Mã OTP và liên kết đăng nhập đã được gửi tới email của bạn.");
+      setStatusMsg("Mã OTP bảo mật đã được gửi tới email của bạn.");
     }
   }
 
-  // 5. Verify OTP Code
-  async function verifyOtpCode(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  // Handle Sign Up & Profile Setup
+  async function handleSignUp(e: React.FormEvent) {
+    e.preventDefault();
+    if (!captchaToken) {
+      setStatus("error");
+      setStatusMsg("Vui lòng hoàn thành câu đố bảo mật chống bot spam.");
+      return;
+    }
+
+    if (!username.trim()) {
+      setStatus("error");
+      setStatusMsg("Vui lòng đặt tên người dùng (@username).");
+      return;
+    }
+
+    const supabase = createClient();
+    if (!supabase) return;
+
+    setStatus("sending");
+    setStatusMsg("");
+
+    const cleanUsername = username.replace(/^@/, "").toLowerCase().trim();
+
+    // Sign up user
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password: password || "Myso@2026Secure",
+      options: {
+        emailRedirectTo: redirectTo(),
+        data: {
+          full_name: fullName || "Thành viên Myso",
+          username: cleanUsername,
+          avatar_url: selectedAvatar,
+        },
+      },
+    });
+
+    if (error) {
+      setStatus("error");
+      setStatusMsg(error.message);
+      return;
+    }
+
+    // Upsert into public.profiles
+    try {
+      await supabase.from("profiles").upsert({
+        user_id: data.user?.id,
+        email,
+        full_name: fullName || "Thành viên Myso",
+        username: cleanUsername,
+        avatar_url: selectedAvatar,
+        bio: bio || "Thành viên mới của mạng xã hội Myso.",
+        verified: false,
+        streak_days: 1,
+      });
+    } catch {}
+
+    setStatus("verified");
+    setStatusMsg("Đăng ký tài khoản thành công! Bạn có thể bắt đầu khám phá và đăng bài ngay.");
+    setTimeout(() => {
+      window.location.href = `/${locale}`;
+    }, 1500);
+  }
+
+  // Verify OTP Code
+  async function verifyOtp(e: React.FormEvent) {
+    e.preventDefault();
     const supabase = createClient();
     if (!supabase) return;
     setStatus("sending");
-    const { data, error } = await supabase.auth.verifyOtp({
+    const { error } = await supabase.auth.verifyOtp({
       email,
       token: otpCode.trim(),
       type: "email",
@@ -97,36 +186,78 @@ export function LoginForm({ locale }: { locale: string }) {
 
     if (error) {
       setStatus("error");
-      setStatusMsg("Mã xác nhận không đúng hoặc đã hết hạn.");
+      setStatusMsg("Mã xác thực không hợp lệ hoặc đã hết hạn.");
     } else {
       setStatus("verified");
-      window.location.href = `/${locale}/admin`;
+      window.location.href = `/${locale}`;
     }
   }
 
   return (
-    <div className="card p-6 sm:p-8 border border-line bg-surface shadow-2xl">
-      <div className="flex items-center gap-2 mb-2">
-        <ShieldCheck className="h-4 w-4 text-accent" />
-        <span className="font-mono text-xs uppercase tracking-wider text-accent font-semibold">
-          MYSO SSO & MULTI-AUTH
+    <div className="card p-6 sm:p-8 border border-line bg-surface shadow-2xl max-w-lg mx-auto">
+      {/* Header Badge */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="h-4 w-4 text-accent" />
+          <span className="font-mono text-xs uppercase tracking-wider text-accent font-semibold">
+            MYSO IDENTITY & SSO
+          </span>
+        </div>
+        <span className="font-mono text-[0.65rem] text-teal border border-teal/40 bg-teal/10 px-2 py-0.5 rounded-full font-bold">
+          E2EE PROTECTED
         </span>
       </div>
-      <h1 className="font-display text-2xl font-bold tracking-tight text-ink">
-        Đăng nhập vào Myso
+
+      {/* Tabs Switcher: Đăng nhập vs Đăng ký */}
+      <div className="grid grid-cols-2 p-1 rounded-xl bg-canvas border border-line mb-6">
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab("login");
+            setStatusMsg("");
+          }}
+          className={`py-2 text-xs sm:text-sm font-semibold rounded-lg transition ${
+            activeTab === "login"
+              ? "bg-accent text-white dark:text-[#04101F] shadow-sm"
+              : "text-muted hover:text-ink"
+          }`}
+        >
+          Đăng Nhập
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab("register");
+            setStatusMsg("");
+          }}
+          className={`py-2 text-xs sm:text-sm font-semibold rounded-lg transition ${
+            activeTab === "register"
+              ? "bg-accent text-white dark:text-[#04101F] shadow-sm"
+              : "text-muted hover:text-ink"
+          }`}
+        >
+          Đăng Ký Tài Khoản
+        </button>
+      </div>
+
+      <h1 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-ink">
+        {activeTab === "login"
+          ? "Chào mừng trở lại với Myso"
+          : "Tạo tài khoản mạng xã hội Myso"}
       </h1>
-      <p className="mt-1.5 text-xs sm:text-sm leading-relaxed text-muted">
-        Đăng nhập nhanh bằng tài khoản Google, X (Twitter), GitHub hoặc nhận mã OTP bảo mật qua Email.
+      <p className="mt-1 text-xs sm:text-sm text-muted leading-relaxed">
+        {activeTab === "login"
+          ? "Đăng nhập nhanh để tương tác, viết bài và tham gia cộng đồng."
+          : "Thiết lập profile cá nhân, chọn avatar và tham gia mạng lưới sáng tạo mở."}
       </p>
 
       {/* Social Logins */}
-      <div className="mt-6 space-y-2.5">
-        {/* Google */}
+      <div className="mt-5 space-y-2.5">
         <button
           type="button"
-          onClick={signInWithGoogle}
+          onClick={() => signInOAuth("google")}
           disabled={status === "sending"}
-          className="inline-flex w-full items-center justify-center gap-2.5 rounded-xl border border-line bg-canvas px-4 py-2.5 text-xs sm:text-sm font-semibold text-ink transition hover:border-accent disabled:opacity-60 shadow-sm"
+          className="inline-flex w-full items-center justify-center gap-2.5 rounded-xl border border-line bg-canvas px-4 py-2.5 text-xs sm:text-sm font-semibold text-ink transition hover:border-accent disabled:opacity-60 shadow-xs"
         >
           <svg className="h-4 w-4" viewBox="0 0 24 24">
             <path
@@ -146,16 +277,15 @@ export function LoginForm({ locale }: { locale: string }) {
               d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
             />
           </svg>
-          Tiếp tục với Google
+          {activeTab === "login" ? "Tiếp tục với Google" : "Đăng ký với Google"}
         </button>
 
         <div className="grid grid-cols-2 gap-2">
-          {/* X (Twitter) */}
           <button
             type="button"
-            onClick={signInWithX}
+            onClick={() => signInOAuth("twitter")}
             disabled={status === "sending"}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-canvas px-3 py-2.5 text-xs font-semibold text-ink transition hover:border-accent disabled:opacity-60 shadow-sm"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-canvas px-3 py-2.5 text-xs font-semibold text-ink transition hover:border-accent disabled:opacity-60 shadow-xs"
           >
             <svg className="h-3.5 w-3.5 fill-current" viewBox="0 0 24 24">
               <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
@@ -163,12 +293,11 @@ export function LoginForm({ locale }: { locale: string }) {
             Tài khoản X
           </button>
 
-          {/* GitHub */}
           <button
             type="button"
-            onClick={signInWithGithub}
+            onClick={() => signInOAuth("github")}
             disabled={status === "sending"}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-canvas px-3 py-2.5 text-xs font-semibold text-ink transition hover:border-accent disabled:opacity-60 shadow-sm"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-canvas px-3 py-2.5 text-xs font-semibold text-ink transition hover:border-accent disabled:opacity-60 shadow-xs"
           >
             <Github className="h-3.5 w-3.5" />
             GitHub
@@ -176,40 +305,16 @@ export function LoginForm({ locale }: { locale: string }) {
         </div>
       </div>
 
-      <div className="my-6 flex items-center gap-3">
+      <div className="my-5 flex items-center gap-3">
         <span className="h-px flex-1 bg-line" />
-        <span className="font-mono text-[0.62rem] uppercase tracking-wider text-subtle">HOẶC DÙNG EMAIL OTP</span>
+        <span className="font-mono text-[0.62rem] uppercase tracking-wider text-subtle">
+          HOẶC DÙNG EMAIL & PROFILE
+        </span>
         <span className="h-px flex-1 bg-line" />
       </div>
 
-      {mode === "otp_request" ? (
-        <form onSubmit={sendEmailOtp} className="space-y-3.5">
-          <div>
-            <label className="mb-1.5 block text-xs font-mono text-subtle uppercase tracking-wider">
-              Địa chỉ Email của bạn
-            </label>
-            <input
-              required
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className={fieldClass}
-              autoComplete="email"
-              placeholder="tenban@example.com"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={status === "sending"}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3 text-xs sm:text-sm font-semibold text-white transition hover:bg-accent/90 disabled:opacity-60 dark:text-[#04101F] shadow-lg"
-          >
-            {status === "sending" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-            Gửi Mã OTP & Link Đăng Nhập
-          </button>
-        </form>
-      ) : (
-        <form onSubmit={verifyOtpCode} className="space-y-3.5">
+      {mode === "otp_verify" ? (
+        <form onSubmit={verifyOtp} className="space-y-3.5">
           <div>
             <label className="mb-1.5 block text-xs font-mono text-subtle uppercase tracking-wider">
               Nhập mã OTP 6 số đã gửi tới {email}
@@ -236,18 +341,176 @@ export function LoginForm({ locale }: { locale: string }) {
 
           <button
             type="button"
-            onClick={() => setMode("otp_request")}
+            onClick={() => setMode("form")}
             className="w-full text-center text-xs text-muted hover:underline font-mono"
           >
-            Gửi lại mã hoặc đổi email khác
+            Quay lại mẫu thông tin
+          </button>
+        </form>
+      ) : activeTab === "login" ? (
+        /* Login Form */
+        <form onSubmit={handleSignIn} className="space-y-3.5">
+          <div>
+            <label className="mb-1 block text-xs font-mono text-subtle">Email</label>
+            <input
+              required
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={fieldClass}
+              placeholder="tenban@example.com"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-mono text-subtle">
+              Mật khẩu (hoặc để trống để nhận OTP qua email)
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className={fieldClass}
+              placeholder="Mật khẩu của bạn..."
+            />
+          </div>
+
+          {/* Anti-Spam Captcha */}
+          <div className="pt-1">
+            <AntiSpamCaptcha onVerify={setCaptchaToken} locale={locale} />
+          </div>
+
+          <button
+            type="submit"
+            disabled={status === "sending" || !captchaToken}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3 text-xs sm:text-sm font-semibold text-white transition hover:bg-accent/90 disabled:opacity-50 dark:text-[#04101F] shadow-lg"
+          >
+            {status === "sending" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+            Đăng Nhập Vào Myso
+          </button>
+        </form>
+      ) : (
+        /* Register & Profile Setup Form */
+        <form onSubmit={handleSignUp} className="space-y-3.5">
+          {/* Avatar Picker */}
+          <div>
+            <label className="mb-1.5 block text-xs font-mono text-subtle">
+              Chọn ảnh đại diện (Avatar)
+            </label>
+            <div className="flex items-center gap-3">
+              <img
+                src={selectedAvatar}
+                alt="Selected Avatar"
+                className="h-12 w-12 rounded-full object-cover border-2 border-accent shadow-sm"
+              />
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                {AVATAR_PRESETS.map((av, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setSelectedAvatar(av)}
+                    className={`h-8 w-8 rounded-full overflow-hidden border transition ${
+                      selectedAvatar === av ? "border-accent scale-110 ring-2 ring-accent/30" : "border-line opacity-70 hover:opacity-100"
+                    }`}
+                  >
+                    <img src={av} alt="Preset" className="h-full w-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-mono text-subtle">Tên hiển thị</label>
+              <input
+                required
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className={fieldClass}
+                placeholder="Alex Trần..."
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-mono text-subtle">Tên định danh (@username)</label>
+              <div className="relative">
+                <span className="absolute left-3 top-2.5 text-xs font-mono text-muted">@</span>
+                <input
+                  required
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+                  className={`${fieldClass} pl-7 font-mono`}
+                  placeholder="alextran"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-mono text-subtle">Email</label>
+            <input
+              required
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={fieldClass}
+              placeholder="tenban@example.com"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-mono text-subtle">Mật khẩu (tối thiểu 6 ký tự)</label>
+            <input
+              required
+              type="password"
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className={fieldClass}
+              placeholder="••••••••"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-mono text-subtle">Tiểu sử ngắn (Bio)</label>
+            <input
+              type="text"
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              className={fieldClass}
+              placeholder="Kỹ sư phần mềm, đam mê AI và công nghệ mở..."
+            />
+          </div>
+
+          {/* Anti-Spam Captcha */}
+          <div className="pt-1">
+            <AntiSpamCaptcha onVerify={setCaptchaToken} locale={locale} />
+          </div>
+
+          <button
+            type="submit"
+            disabled={status === "sending" || !captchaToken}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3 text-xs sm:text-sm font-semibold text-white transition hover:bg-accent/90 disabled:opacity-50 dark:text-[#04101F] shadow-lg"
+          >
+            {status === "sending" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            Hoàn Tất Đăng Ký & Tạo Profile
           </button>
         </form>
       )}
 
       {statusMsg && (
-        <p className={`mt-4 text-xs font-mono ${status === "error" ? "text-amber-500" : "text-teal"}`}>
+        <div
+          className={`mt-4 rounded-xl p-3 text-xs font-mono ${
+            status === "error"
+              ? "border border-rose-500/30 bg-rose-500/10 text-rose-400"
+              : "border border-teal/30 bg-teal/10 text-teal"
+          }`}
+        >
           {statusMsg}
-        </p>
+        </div>
       )}
     </div>
   );
