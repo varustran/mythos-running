@@ -13,6 +13,11 @@ import {
   Paperclip,
   Smile,
   FileText,
+  UserPlus,
+  UserCheck,
+  ShieldAlert,
+  Inbox,
+  Users,
 } from "lucide-react";
 import type { Locale } from "@/lib/i18n/settings";
 import Link from "next/link";
@@ -35,18 +40,24 @@ interface ChatContact {
   online: boolean;
   lastMessage: string;
   time: string;
+  isFriend: boolean;
 }
 
 export function EncryptedChatClient({ locale }: { locale: Locale }) {
+  const [activeTab, setActiveTab] = useState<"friends" | "requests">("friends");
   const [activeContact, setActiveContact] = useState<string>("alextran");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [showImageInput, setShowImageInput] = useState(false);
   const [sending, setSending] = useState(false);
+  const [friendshipStatus, setFriendshipStatus] = useState<"friends" | "pending" | "stranger">("friends");
+  const [newFriendHandle, setNewFriendHandle] = useState("");
+  const [showAddFriend, setShowAddFriend] = useState(false);
+  const [friendActionMsg, setFriendActionMsg] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const contacts: ChatContact[] = [
+  const [contacts, setContacts] = useState<ChatContact[]>([
     {
       handle: "alextran",
       name: "Alex Trần",
@@ -54,6 +65,7 @@ export function EncryptedChatClient({ locale }: { locale: Locale }) {
       online: true,
       lastMessage: "Kiến trúc AI Agent đã tối ưu hóa xong rồi bạn nhé!",
       time: "10:45",
+      isFriend: true,
     },
     {
       handle: "hoangminh",
@@ -62,6 +74,7 @@ export function EncryptedChatClient({ locale }: { locale: Locale }) {
       online: true,
       lastMessage: "Bạn xem qua bài viết mới về biohacking chưa?",
       time: "Hôm qua",
+      isFriend: true,
     },
     {
       handle: "elena",
@@ -70,6 +83,7 @@ export function EncryptedChatClient({ locale }: { locale: Locale }) {
       online: false,
       lastMessage: "Tài liệu khoa học đã được trích dẫn chuẩn hóa.",
       time: "28/10",
+      isFriend: true,
     },
     {
       handle: "myso_support",
@@ -78,8 +92,26 @@ export function EncryptedChatClient({ locale }: { locale: Locale }) {
       online: true,
       lastMessage: "Kênh trò chuyện bảo mật mã hóa đầu cuối đã sẵn sàng.",
       time: "26/10",
+      isFriend: true,
     },
-  ];
+    {
+      handle: "nguoila_9921",
+      name: "Kỹ sư Crypto Ẩn Danh",
+      avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
+      online: false,
+      lastMessage: "Chào bạn, mình muốn trao đổi về dự án mở rộng cộng đồng...",
+      time: "15:20",
+      isFriend: false,
+    },
+  ]);
+
+  // Check relationship status when activeContact changes
+  useEffect(() => {
+    const contact = contacts.find((c) => c.handle === activeContact);
+    if (contact) {
+      setFriendshipStatus(contact.isFriend ? "friends" : "stranger");
+    }
+  }, [activeContact, contacts]);
 
   // Load chat messages
   useEffect(() => {
@@ -170,6 +202,76 @@ export function EncryptedChatClient({ locale }: { locale: Locale }) {
     }
   };
 
+  // Handle Accept Message Request / Friend
+  const handleAcceptStranger = async () => {
+    try {
+      await fetch("/api/social/relationship", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_handle: "me",
+          target_handle: activeContact,
+          action: "accept_friend",
+        }),
+      });
+
+      setFriendshipStatus("friends");
+      setContacts((prev) =>
+        prev.map((c) => (c.handle === activeContact ? { ...c, isFriend: true } : c))
+      );
+      setFriendActionMsg("Đã chấp nhận kết bạn! Cuộc trò chuyện chuyển vào danh sách Bạn Bè.");
+      setTimeout(() => setFriendActionMsg(null), 3000);
+    } catch {}
+  };
+
+  // Handle Block
+  const handleBlockStranger = async () => {
+    try {
+      await fetch("/api/social/relationship", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_handle: "me",
+          target_handle: activeContact,
+          action: "block",
+        }),
+      });
+
+      setContacts((prev) => prev.filter((c) => c.handle !== activeContact));
+      setActiveContact("alextran");
+      setFriendActionMsg("Đã chặn người dùng này.");
+      setTimeout(() => setFriendActionMsg(null), 3000);
+    } catch {}
+  };
+
+  // Add friend by username
+  const handleAddNewFriend = (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = newFriendHandle.replace(/^@/, "").toLowerCase().trim();
+    if (!clean) return;
+
+    const existing = contacts.find((c) => c.handle === clean);
+    if (!existing) {
+      const newContact: ChatContact = {
+        handle: clean,
+        name: `@${clean}`,
+        avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80",
+        online: false,
+        lastMessage: "Bắt đầu cuộc trò chuyện mới...",
+        time: "Vừa xong",
+        isFriend: true,
+      };
+      setContacts([newContact, ...contacts]);
+    }
+    setActiveContact(clean);
+    setNewFriendHandle("");
+    setShowAddFriend(false);
+  };
+
+  const filteredContacts = contacts.filter((c) =>
+    activeTab === "friends" ? c.isFriend : !c.isFriend
+  );
+
   const currentContact = contacts.find((c) => c.handle === activeContact) || contacts[0];
 
   return (
@@ -185,54 +287,97 @@ export function EncryptedChatClient({ locale }: { locale: Locale }) {
               </div>
               <h2 className="font-display text-base font-bold text-ink">Myso Chat 🔒</h2>
             </div>
-            <span className="font-mono text-[0.62rem] text-teal border border-teal/40 bg-teal/10 px-2 py-0.5 rounded-full font-bold">
-              E2EE
-            </span>
+            <button
+              onClick={() => setShowAddFriend(!showAddFriend)}
+              className="grid h-7 w-7 place-items-center rounded-lg border border-line hover:border-accent text-muted hover:text-ink transition"
+              title="Thêm bạn mới"
+            >
+              <UserPlus className="h-3.5 w-3.5" />
+            </button>
           </div>
 
-          {/* Search bar */}
-          <div className="p-3 border-b border-line">
-            <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-subtle" />
+          {/* Add Friend Input Toggle */}
+          {showAddFriend && (
+            <form onSubmit={handleAddNewFriend} className="p-3 border-b border-line bg-surface flex gap-2">
               <input
                 type="text"
-                placeholder="Tìm bạn bè hoặc @username..."
-                className="w-full rounded-xl border border-line bg-surface pl-8 pr-3 py-1.5 text-xs text-ink placeholder:text-subtle focus:outline-none focus:border-accent"
+                value={newFriendHandle}
+                onChange={(e) => setNewFriendHandle(e.target.value)}
+                placeholder="Nhập @username bạn bè..."
+                className="flex-1 rounded-xl border border-line bg-canvas px-3 py-1.5 text-xs text-ink focus:outline-none focus:border-accent"
               />
-            </div>
+              <button
+                type="submit"
+                className="px-3 py-1.5 rounded-xl bg-accent text-white dark:text-[#04101F] text-xs font-semibold"
+              >
+                Thêm
+              </button>
+            </form>
+          )}
+
+          {/* Filter Tabs: Bạn bè vs Tin nhắn chờ */}
+          <div className="grid grid-cols-2 p-1.5 border-b border-line bg-canvas">
+            <button
+              onClick={() => setActiveTab("friends")}
+              className={`py-1.5 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition ${
+                activeTab === "friends"
+                  ? "bg-accent text-white dark:text-[#04101F] shadow-xs"
+                  : "text-muted hover:text-ink"
+              }`}
+            >
+              <Users className="h-3.5 w-3.5" />
+              Bạn Bè ({contacts.filter((c) => c.isFriend).length})
+            </button>
+            <button
+              onClick={() => setActiveTab("requests")}
+              className={`py-1.5 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition ${
+                activeTab === "requests"
+                  ? "bg-accent text-white dark:text-[#04101F] shadow-xs"
+                  : "text-muted hover:text-ink"
+              }`}
+            >
+              <Inbox className="h-3.5 w-3.5" />
+              Tin Chờ ({contacts.filter((c) => !c.isFriend).length})
+            </button>
           </div>
 
           {/* Contact List */}
           <div className="flex-1 overflow-y-auto divide-y divide-line/60">
-            {contacts.map((contact) => (
-              <button
-                key={contact.handle}
-                onClick={() => setActiveContact(contact.handle)}
-                className={`w-full p-3.5 flex items-center gap-3 text-left transition ${
-                  activeContact === contact.handle ? "bg-accent/10 border-l-4 border-accent" : "hover:bg-canvas"
-                }`}
-              >
-                <div className="relative">
-                  <img
-                    src={contact.avatar}
-                    alt={contact.name}
-                    className="h-11 w-11 rounded-full object-cover border border-line"
-                  />
-                  {contact.online && (
-                    <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-emerald-500 border-2 border-surface" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="font-display text-xs font-bold text-ink truncate">
-                      {contact.name}
-                    </span>
-                    <span className="text-[0.65rem] font-mono text-subtle">{contact.time}</span>
+            {filteredContacts.length === 0 ? (
+              <div className="p-8 text-center text-xs text-muted">
+                {activeTab === "friends" ? "Chưa có liên hệ bạn bè nào." : "Không có tin nhắn chờ từ người lạ."}
+              </div>
+            ) : (
+              filteredContacts.map((contact) => (
+                <button
+                  key={contact.handle}
+                  onClick={() => setActiveContact(contact.handle)}
+                  className={`w-full p-3.5 flex items-center gap-3 text-left transition ${
+                    activeContact === contact.handle ? "bg-accent/10 border-l-4 border-accent" : "hover:bg-canvas"
+                  }`}
+                >
+                  <div className="relative">
+                    <img
+                      src={contact.avatar}
+                      alt={contact.name}
+                      className="h-11 w-11 rounded-full object-cover border border-line"
+                    />
+                    {contact.online && (
+                      <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-emerald-500 border-2 border-surface" />
+                    )}
                   </div>
-                  <p className="text-[0.72rem] text-muted truncate mt-0.5">{contact.lastMessage}</p>
-                </div>
-              </button>
-            ))}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="font-display text-xs font-bold text-ink truncate">
+                        {contact.name}
+                      </span>
+                      <span className="text-[0.65rem] font-mono text-subtle">{contact.time}</span>
+                    </div>
+                    <p className="text-[0.72rem] text-muted truncate mt-0.5">{contact.lastMessage}</p>
+                  </div>
+                </button>
+              ))
+            )}
           </div>
 
           {/* Bottom Security Note */}
@@ -278,6 +423,39 @@ export function EncryptedChatClient({ locale }: { locale: Locale }) {
               <span>Tiêu chuẩn</span>
             </Link>
           </div>
+
+          {/* Stranger Banner (Tin nhắn chờ cảnh báo) */}
+          {friendshipStatus !== "friends" && (
+            <div className="p-3.5 bg-amber-500/10 border-b border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-amber-300">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="h-4 w-4 text-amber-400 shrink-0" />
+                <span>
+                  <strong>Tin nhắn từ người lạ:</strong> @{currentContact.handle} chưa có trong danh bạ bạn bè của bạn.
+                </span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={handleAcceptStranger}
+                  className="px-3 py-1 rounded-lg bg-teal text-black font-semibold text-xs flex items-center gap-1 shadow-xs"
+                >
+                  <UserCheck className="h-3.5 w-3.5" />
+                  Chấp Nhận & Kết Bạn
+                </button>
+                <button
+                  onClick={handleBlockStranger}
+                  className="px-3 py-1 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/40 text-xs font-semibold"
+                >
+                  Chặn
+                </button>
+              </div>
+            </div>
+          )}
+
+          {friendActionMsg && (
+            <div className="p-2.5 bg-teal/10 border-b border-teal/30 text-teal text-xs text-center font-mono">
+              {friendActionMsg}
+            </div>
+          )}
 
           {/* Messages Stream */}
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">

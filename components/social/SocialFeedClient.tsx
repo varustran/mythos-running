@@ -18,11 +18,9 @@ import {
   Check,
   X,
   Lock,
-  BarChart2,
-  Smile,
+  Languages,
   Hash,
   AlertCircle,
-  HelpCircle,
   CheckCircle2,
   Award,
   Zap,
@@ -30,6 +28,9 @@ import {
 import type { Locale } from "@/lib/i18n/settings";
 import { localePath } from "@/lib/i18n/settings";
 import { AntiSpamCaptcha } from "@/components/security/AntiSpamCaptcha";
+import { RichContentRenderer } from "@/components/content/RichContentRenderer";
+import { getOrCreateAnonymousIdentity, type AnonymousIdentity } from "@/lib/anonymous";
+import { inspectContent } from "@/lib/moderation";
 
 interface SocialPostItem {
   id: string;
@@ -70,6 +71,14 @@ export function SocialFeedClient({
   const [showImageField, setShowImageField] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [posting, setPosting] = useState(false);
+  const [moderationWarning, setModerationWarning] = useState<string | null>(null);
+
+  // User identity
+  const [anonIdentity, setAnonIdentity] = useState<AnonymousIdentity | null>(null);
+
+  // Translations cache
+  const [translatedPosts, setTranslatedPosts] = useState<Record<string, string>>({});
+  const [translatingPostId, setTranslatingPostId] = useState<string | null>(null);
 
   // User interaction states
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
@@ -93,51 +102,11 @@ export function SocialFeedClient({
   const [streakCount, setStreakCount] = useState(3);
   const [checkedInToday, setCheckedInToday] = useState(false);
 
-  // Curated initial seed posts if database is fresh
-  const curatedStarterPosts: SocialPostItem[] = [
-    {
-      id: "post-seed-1",
-      author_name: "Alex Trần",
-      author_handle: "alextran",
-      author_avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-      content: "Chính thức thử nghiệm mạng xã hội #Myso! Nền tảng kết hợp mạng xã hội thời gian thực, bách khoa toàn thư mở Wikipedia và kênh chat mã hóa đầu cuối E2EE. Không gian thảo luận tự do, tôn trọng sự phản biện và minh bạch pháp lý! 🚀✨ #AI #CongNghe2026",
-      media_urls: ["https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80"],
-      category: "ai",
-      likes_count: 0,
-      reposts_count: 0,
-      comments_count: 0,
-      bookmarks_count: 0,
-      created_at: new Date(Date.now() - 3600000).toISOString(),
-    },
-    {
-      id: "post-seed-2",
-      author_name: "Dr. Elena Nguyễn",
-      author_handle: "elena_science",
-      author_avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80",
-      content: "Nghiên cứu mới về nhịp sinh học Circadian cho thấy: Tiếp xúc ánh sáng mặt trời tự nhiên trong 30 phút đầu sau khi thức dậy giúp cải thiện 40% nồng độ dopamine và ổn định chu kỳ giấc ngủ sâu ban đêm. Chi tiết bài nghiên cứu đã được biên tập trên Myso Wiki! 🧠💡 #KhoaHoc #Biohacking",
-      media_urls: ["https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&auto=format&fit=crop&q=80"],
-      category: "science",
-      likes_count: 0,
-      reposts_count: 0,
-      comments_count: 0,
-      bookmarks_count: 0,
-      created_at: new Date(Date.now() - 7200000).toISOString(),
-    },
-    {
-      id: "post-seed-3",
-      author_name: "Hoàng Minh",
-      author_handle: "hoangminh_dev",
-      author_avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
-      content: "Đã có ai thử nghiệm công nghệ WebAssembly (Wasm) kết hợp Rust để xử lý đồ họa trực tiếp trong trình duyệt chưa? Tốc độ thực thi tiệm cận native app, cực kỳ ấn tượng! Đặt câu hỏi hoặc chia sẻ repo của bạn phía dưới nhé 👇 #LapTrinh #Rust #WebAssembly",
-      media_urls: [],
-      category: "tech",
-      likes_count: 0,
-      reposts_count: 0,
-      comments_count: 0,
-      bookmarks_count: 0,
-      created_at: new Date(Date.now() - 10800000).toISOString(),
-    },
-  ];
+  // Initialize anonymous identity
+  useEffect(() => {
+    const ident = getOrCreateAnonymousIdentity();
+    setAnonIdentity(ident);
+  }, []);
 
   // Load feed from Supabase
   useEffect(() => {
@@ -148,13 +117,11 @@ export function SocialFeedClient({
           const data = await res.json();
           if (Array.isArray(data.posts) && data.posts.length > 0) {
             setPosts(data.posts);
-            return;
           }
         }
       } catch (err) {
         console.error("Load feed error:", err);
       }
-      setPosts(curatedStarterPosts);
     }
     loadFeed();
   }, [activeTab]);
@@ -162,15 +129,29 @@ export function SocialFeedClient({
   // Handle Post Creation
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!postContent.trim() || !captchaToken) return;
+    setModerationWarning(null);
+
+    if (!postContent.trim()) return;
+    if (!captchaToken) {
+      setModerationWarning("Vui lòng hoàn tất xác thực bảo mật chống spam.");
+      return;
+    }
+
+    // Automated Keyword Moderation Filter
+    const modResult = inspectContent(postContent);
+    if (!modResult.isAllowed) {
+      setModerationWarning(modResult.userMessage || "Nội dung vi phạm tiêu chuẩn cộng đồng.");
+      return;
+    }
 
     setPosting(true);
     const mediaUrls = imageUrlInput.trim() ? [imageUrlInput.trim()] : [];
+    const author = anonIdentity || { displayName: "Thành viên Myso", handle: "user" };
 
     const optimisticPost: SocialPostItem = {
       id: `post-local-${Date.now()}`,
-      author_name: "Bạn (Người dùng Myso)",
-      author_handle: "user",
+      author_name: author.displayName,
+      author_handle: author.handle,
       author_avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80",
       content: postContent.trim(),
       media_urls: mediaUrls,
@@ -278,7 +259,7 @@ export function SocialFeedClient({
     }
   };
 
-  // Toggle Comments Drawer
+  // Toggle & Fetch Comments
   const toggleComments = async (postId: string) => {
     const isExpanded = expandedPostComments[postId];
     setExpandedPostComments((prev) => ({ ...prev, [postId]: !isExpanded }));
@@ -294,17 +275,26 @@ export function SocialFeedClient({
     }
   };
 
-  // Submit Comment
+  // Submit Comment with Anonymous Identity & Keyword Filter
   const handleSendComment = async (postId: string) => {
     const text = commentInputs[postId] || "";
     if (!text.trim()) return;
 
+    // Automated Moderation Check
+    const mod = inspectContent(text);
+    if (!mod.isAllowed) {
+      alert(mod.userMessage);
+      return;
+    }
+
     setSubmittingComment((prev) => ({ ...prev, [postId]: true }));
+    const author = anonIdentity || { displayName: "Thành viên Ẩn danh #1024", handle: "guest_1024" };
+
     const newComment: SocialCommentItem = {
       id: `c-${Date.now()}`,
       post_id: postId,
-      author_name: "Bạn",
-      author_handle: "user",
+      author_name: author.displayName,
+      author_handle: author.handle,
       author_avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80",
       content: text.trim(),
       created_at: new Date().toISOString(),
@@ -334,6 +324,35 @@ export function SocialFeedClient({
     setSubmittingComment((prev) => ({ ...prev, [postId]: false }));
   };
 
+  // Translation handler
+  const handleTranslatePost = async (postId: string, text: string) => {
+    if (translatedPosts[postId]) {
+      // Toggle off translation
+      setTranslatedPosts((prev) => {
+        const copy = { ...prev };
+        delete copy[postId];
+        return copy;
+      });
+      return;
+    }
+
+    setTranslatingPostId(postId);
+    try {
+      const res = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, targetLang: locale }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.translatedText) {
+          setTranslatedPosts((prev) => ({ ...prev, [postId]: data.translatedText }));
+        }
+      }
+    } catch {}
+    setTranslatingPostId(null);
+  };
+
   // Report Submission
   const handleSendReport = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -358,7 +377,6 @@ export function SocialFeedClient({
     } catch {}
   };
 
-  // Check in streak
   const handleDailyCheckIn = () => {
     if (!checkedInToday) {
       setStreakCount((prev) => prev + 1);
@@ -397,7 +415,7 @@ export function SocialFeedClient({
                 <span>Chat Mã Hóa (E2EE)</span>
               </div>
               <span className="text-[0.62rem] font-mono bg-teal/20 text-teal px-1.5 py-0.5 rounded font-bold">
-                NEW
+                E2EE
               </span>
             </Link>
 
@@ -446,16 +464,18 @@ export function SocialFeedClient({
               />
               <div className="min-w-0">
                 <span className="font-display text-xs font-bold text-ink truncate block">
-                  Thành viên Myso
+                  {anonIdentity ? anonIdentity.displayName : "Thành viên Myso"}
                 </span>
-                <span className="font-mono text-[0.68rem] text-subtle truncate block">@user</span>
+                <span className="font-mono text-[0.68rem] text-subtle truncate block">
+                  @{anonIdentity ? anonIdentity.handle : "user"}
+                </span>
               </div>
             </div>
             <Link
               href={localePath(locale, "/login")}
               className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-canvas border border-line px-3 py-2 text-xs font-semibold text-ink hover:border-accent transition"
             >
-              Thiết lập hồ sơ cá nhân
+              Tạo tài khoản / Thiết lập hồ sơ
             </Link>
           </div>
         </nav>
@@ -485,7 +505,7 @@ export function SocialFeedClient({
             ))}
           </div>
 
-          {/* Post Composer ("Bạn đang nghĩ gì?") */}
+          {/* Post Composer */}
           <div className="rounded-3xl border border-line bg-surface p-4 sm:p-5 shadow-sm space-y-3">
             <div className="flex items-start gap-3">
               <img
@@ -497,10 +517,17 @@ export function SocialFeedClient({
                 rows={3}
                 value={postContent}
                 onChange={(e) => setPostContent(e.target.value)}
-                placeholder="Bạn đang nghĩ gì? Chia sẻ góc nhìn, ý tưởng hoặc kiến thức mới..."
+                placeholder="Bạn đang nghĩ gì? Chia sẻ ý tưởng, góc nhìn (hỗ trợ in đậm **chữ**, liên kết, hashtag)..."
                 className="w-full bg-transparent text-sm sm:text-base text-ink placeholder:text-subtle focus:outline-none resize-none leading-relaxed"
               />
             </div>
+
+            {moderationWarning && (
+              <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-xs text-rose-400 font-mono flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{moderationWarning}</span>
+              </div>
+            )}
 
             {/* Image input expand */}
             {showImageField && (
@@ -582,6 +609,9 @@ export function SocialFeedClient({
               const isBookmarked = bookmarkedPosts[post.id] || false;
               const isCommentsExpanded = expandedPostComments[post.id] || false;
               const postComments = commentsMap[post.id] || [];
+              const isTranslating = translatingPostId === post.id;
+              const isTranslated = !!translatedPosts[post.id];
+              const displayContent = translatedPosts[post.id] || post.content;
 
               return (
                 <article
@@ -604,7 +634,9 @@ export function SocialFeedClient({
                           <span className="font-display text-sm font-bold text-ink">
                             {post.author_name}
                           </span>
-                          <CheckCircle2 className="h-3.5 w-3.5 text-accent" />
+                          {post.author_handle === "myso" && (
+                            <CheckCircle2 className="h-4 w-4 text-accent fill-accent text-white" />
+                          )}
                           <span className="font-mono text-xs text-subtle">@{post.author_handle}</span>
                         </div>
                         <span className="font-mono text-[0.65rem] text-muted">
@@ -613,29 +645,41 @@ export function SocialFeedClient({
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setReportingPostId(post.id)}
-                      className="p-1.5 rounded-xl text-subtle hover:text-rose-500 hover:bg-canvas transition"
-                      title="Báo cáo nội dung vi phạm"
-                    >
-                      <Flag className="h-4 w-4" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      {/* Translate button */}
+                      <button
+                        type="button"
+                        onClick={() => handleTranslatePost(post.id, post.content)}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[0.7rem] font-mono transition ${
+                          isTranslated ? "bg-accent/15 text-accent font-bold" : "text-subtle hover:text-ink hover:bg-canvas"
+                        }`}
+                        title="Dịch nội dung sang ngôn ngữ hiện tại"
+                      >
+                        <Languages className="h-3.5 w-3.5" />
+                        <span>{isTranslating ? "Đang dịch..." : isTranslated ? "Xem bản gốc" : "Dịch"}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setReportingPostId(post.id)}
+                        className="p-1.5 rounded-xl text-subtle hover:text-rose-500 hover:bg-canvas transition"
+                        title="Báo cáo vi phạm"
+                      >
+                        <Flag className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Post Content */}
-                  <div className="text-sm sm:text-base text-ink leading-relaxed whitespace-pre-wrap">
-                    {post.content.split(" ").map((word, idx) => {
-                      if (word.startsWith("#")) {
-                        return (
-                          <span key={idx} className="text-accent font-semibold hover:underline cursor-pointer">
-                            {word}{" "}
-                          </span>
-                        );
-                      }
-                      return word + " ";
-                    })}
+                  {/* Post Content using RichContentRenderer (renders **bold** correctly!) */}
+                  <div className="text-sm sm:text-base leading-relaxed">
+                    <RichContentRenderer content={displayContent} />
                   </div>
+
+                  {isTranslated && (
+                    <p className="text-[0.68rem] font-mono text-teal">
+                      ✓ Bản dịch tự động hỗ trợ bởi AI · Giữ tính toàn vẹn nội dung gốc
+                    </p>
+                  )}
 
                   {/* Media Gallery */}
                   {post.media_urls && post.media_urls.length > 0 && (
@@ -651,7 +695,6 @@ export function SocialFeedClient({
 
                   {/* Action Bar (Like, Comment, Repost, Bookmark, Share) */}
                   <div className="flex items-center justify-between pt-3 border-t border-line text-xs font-mono text-muted">
-                    {/* Like */}
                     <button
                       type="button"
                       onClick={() => handleLike(post.id)}
@@ -663,7 +706,6 @@ export function SocialFeedClient({
                       <span>{post.likes_count}</span>
                     </button>
 
-                    {/* Comment */}
                     <button
                       type="button"
                       onClick={() => toggleComments(post.id)}
@@ -673,7 +715,6 @@ export function SocialFeedClient({
                       <span>{post.comments_count}</span>
                     </button>
 
-                    {/* Repost */}
                     <button
                       type="button"
                       onClick={() => handleRepost(post.id)}
@@ -685,7 +726,6 @@ export function SocialFeedClient({
                       <span>{post.reposts_count}</span>
                     </button>
 
-                    {/* Bookmark */}
                     <button
                       type="button"
                       onClick={() => handleBookmark(post.id)}
@@ -696,7 +736,6 @@ export function SocialFeedClient({
                       <Bookmark className={`h-4 w-4 ${isBookmarked ? "fill-current" : ""}`} />
                     </button>
 
-                    {/* Share */}
                     <button
                       type="button"
                       onClick={() => handleShare(post.id)}
@@ -716,6 +755,14 @@ export function SocialFeedClient({
                   {/* Inline Comments Section */}
                   {isCommentsExpanded && (
                     <div className="pt-3 border-t border-line space-y-3">
+                      {/* Identity badge for commenting */}
+                      <div className="text-[0.68rem] font-mono text-subtle flex items-center justify-between">
+                        <span>Bình luận dưới danh nghĩa: <strong>{anonIdentity?.displayName}</strong></span>
+                        <Link href={localePath(locale, "/login")} className="text-accent underline">
+                          Đăng nhập để dùng tên thật
+                        </Link>
+                      </div>
+
                       {/* Comment Input */}
                       <div className="flex items-center gap-2">
                         <input
@@ -727,7 +774,7 @@ export function SocialFeedClient({
                           onKeyDown={(e) => {
                             if (e.key === "Enter") handleSendComment(post.id);
                           }}
-                          placeholder="Viết phản hồi công khai..."
+                          placeholder="Viết phản hồi công khai (Enter để gửi)..."
                           className="flex-1 rounded-xl border border-line bg-canvas px-3.5 py-2 text-xs text-ink placeholder:text-subtle focus:outline-none focus:border-accent"
                         />
                         <button
@@ -740,7 +787,7 @@ export function SocialFeedClient({
                         </button>
                       </div>
 
-                      {/* Comments List */}
+                      {/* Comments List from DB */}
                       <div className="space-y-2 pt-1">
                         {postComments.length === 0 ? (
                           <p className="text-[0.72rem] text-subtle font-mono text-center py-2">
@@ -759,7 +806,9 @@ export function SocialFeedClient({
                                     {new Date(c.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                                   </span>
                                 </div>
-                                <p className="text-muted mt-0.5 whitespace-pre-wrap">{c.content}</p>
+                                <div className="text-muted mt-0.5">
+                                  <RichContentRenderer content={c.content} />
+                                </div>
                               </div>
                             </div>
                           ))
@@ -893,7 +942,7 @@ export function SocialFeedClient({
 
                 <div className="space-y-2 text-xs">
                   {[
-                    { id: "spam", label: "Spam, quảng cáo lừa đảo hoặc mã độc" },
+                    { id: "spam", label: "Spam, quảng cáo lừa đảo hoặc cờ bạc" },
                     { id: "illegal", label: "Nội dung vi phạm pháp luật / an ninh" },
                     { id: "harassment", label: "Công kích cá nhân, vu khống hoặc xúc phạm" },
                     { id: "misinformation", label: "Thông tin sai lệch chưa được kiểm chứng" },
