@@ -26,7 +26,7 @@ export default async function EventsPage({ params }: { params: Promise<{ locale:
 
   return (
     <>
-      <PageHero eyebrow="Mythos Events" title={t("title")} description={t("desc")} />
+      <PageHero eyebrow="Mythos Events" title={t("title")} description={t("desc")} image="/images/hero-running.jpg" />
       <div className="container-page py-12 sm:py-16">
         <p className="mb-8 rounded-xl border border-amber-500/25 bg-amber-500/5 px-4 py-3 text-xs leading-relaxed text-muted">
           {t("sampleNotice")}

@@ -29,7 +29,7 @@ export default async function AcademyPage({
 
   return (
     <>
-      <PageHero eyebrow="Mythos Academy" title={t("title")} description={t("desc")} />
+      <PageHero eyebrow="Mythos Academy" title={t("title")} description={t("desc")} image="/images/academy-training.jpg" />
       <AcademyBrowser articles={articles} locale={locale} query={q} />
     </>
   );

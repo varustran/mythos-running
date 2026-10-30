@@ -9,9 +9,23 @@ import { Badge } from "@/components/ui/Badge";
 export function GearCard({ review, locale, index = 1 }: { review: GearReview; locale: Locale; index?: number }) {
   const t = getT(locale, "gear");
 
+  const gearImages: Record<string, string> = {
+    shoes: "/images/gear-shoes.jpg",
+    watches: "/images/gear-watch.jpg",
+    hydration: "/images/academy-hydration.jpg",
+    apparel: "/images/hero-running.jpg",
+    recovery: "/images/community-1.jpg",
+    accessories: "/images/route-vong-canh.jpg",
+  };
+
   return (
     <Link href={`/${locale}/gear/${review.slug}`} className="group card card-hover flex flex-col overflow-hidden">
-      <Artwork seed={index + 2} label={t(`categories.${review.category}`)} className="aspect-[16/9] w-full" />
+      <Artwork
+        seed={index + 2}
+        image={gearImages[review.category] || "/images/gear-shoes.jpg"}
+        label={t(`categories.${review.category}`)}
+        className="aspect-[16/9] w-full"
+      />
       <div className="flex flex-1 flex-col p-5">
         <Badge tone="outline">{t(`categories.${review.category}`)}</Badge>
         <h3 className="mt-3 font-display text-lg font-semibold leading-snug text-ink transition group-hover:text-accent">

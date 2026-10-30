@@ -6,17 +6,30 @@ export function PageHero({
   description,
   children,
   className,
+  image,
 }: {
   eyebrow?: string;
   title: string;
   description?: string;
   children?: React.ReactNode;
   className?: string;
+  image?: string;
 }) {
   return (
     <section className={cn("relative overflow-hidden border-b border-line", className)}>
-      <div className="pointer-events-none absolute inset-0 bg-grid opacity-60" aria-hidden="true" />
-      <div className="container-page relative py-14 sm:py-20">
+      {image ? (
+        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+          <img
+            src={image}
+            alt=""
+            className="h-full w-full object-cover opacity-20 filter blur-[1px] dark:opacity-25"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-canvas via-canvas/80 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-canvas via-canvas/60 to-transparent" />
+        </div>
+      ) : null}
+      <div className="pointer-events-none absolute inset-0 bg-grid opacity-60 z-0" aria-hidden="true" />
+      <div className="container-page relative z-10 py-14 sm:py-20">
         {eyebrow ? <p className="eyebrow mb-4">{eyebrow}</p> : null}
         <h1 className="display-title max-w-4xl text-4xl leading-[1.04] sm:text-5xl lg:text-6xl">{title}</h1>
         {description ? <p className="mt-5 max-w-2xl text-base leading-relaxed text-muted sm:text-lg">{description}</p> : null}

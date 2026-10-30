@@ -21,13 +21,28 @@ export function ArticleCard({
   const t = getT(locale, "academy");
   const common = getT(locale, "common");
 
+  const categoryImages: Record<string, string> = {
+    beginner: "/images/academy-beginner.jpg",
+    training: "/images/academy-training.jpg",
+    physiology: "/images/academy-physiology.jpg",
+    nutrition: "/images/academy-hydration.jpg",
+    recovery: "/images/hero-running.jpg",
+    racing: "/images/route-kinh-thanh.jpg",
+    gear: "/images/gear-shoes.jpg",
+  };
+
   return (
     <Link
       href={`/${locale}/academy/${article.slug}`}
       className={cn("group card card-hover flex flex-col overflow-hidden", large && "md:flex-row")}
     >
       <div className={cn("relative", large ? "md:w-1/2" : "")}>
-        <Artwork seed={index} label={t(`categories.${article.category}`)} className={cn("aspect-[16/10] w-full", large && "md:h-full md:aspect-auto")} />
+        <Artwork
+          seed={index}
+          image={categoryImages[article.category]}
+          label={t(`categories.${article.category}`)}
+          className={cn("aspect-[16/10] w-full", large && "md:h-full md:aspect-auto")}
+        />
         {article.featured ? (
           <Badge tone="accent" className="absolute left-4 top-4 bg-canvas/90 backdrop-blur">
             {common("featured")}

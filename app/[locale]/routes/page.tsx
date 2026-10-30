@@ -22,7 +22,7 @@ export default async function RoutesPage({ params }: { params: Promise<{ locale:
 
   return (
     <>
-      <PageHero eyebrow="Hue Routes" title={t("title")} description={t("desc")} />
+      <PageHero eyebrow="Hue Routes" title={t("title")} description={t("desc")} image="/images/route-song-huong.jpg" />
       <div className="container-page py-12 sm:py-16">
         {routes.length === 0 ? (
           <EmptyState title={t("noRoutes")} />

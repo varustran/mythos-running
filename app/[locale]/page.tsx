@@ -113,9 +113,9 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                 <span className="rounded-full bg-teal/10 px-2.5 py-1 font-mono text-[0.62rem] text-teal">5:12 /km</span>
               </div>
               <div className="relative mt-4 overflow-hidden rounded-xl border border-line bg-elevated/70">
-                <Artwork seed={2} className="aspect-[16/9] w-full opacity-90" />
-                <span className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-canvas/80 px-2 py-1 font-mono text-[0.58rem] uppercase tracking-[0.14em] text-muted backdrop-blur">
-                  <MapPin className="h-3 w-3" /> Hue
+                <Artwork seed={1} image="/images/hero-running.jpg" className="aspect-[16/9] w-full" />
+                <span className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-canvas/80 px-2.5 py-1 font-mono text-[0.58rem] uppercase tracking-[0.14em] text-ink backdrop-blur">
+                  <MapPin className="h-3 w-3 text-accent" /> Hue, Vietnam
                 </span>
               </div>
               <div className="mt-5 grid grid-cols-3 gap-3">
@@ -247,6 +247,39 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                 <RouteCard key={route.slug} route={route} locale={locale} index={index + 2} />
               ))}
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b border-line bg-surface/30">
+        <div className="container-page py-16 sm:py-20">
+          <SectionHeading
+            eyebrow="06 — Community Moments"
+            title={locale === "vi" ? "Khoảnh khắc Mythos Running tại Huế" : locale === "zh-CN" ? "Mythos 在顺化的跑步瞬间" : locale === "ja" ? "フエでのMythosランニングの瞬間" : "Mythos Running Moments in Hue"}
+            description={locale === "vi" ? "Những bước chạy thực tế qua từng con đường cổ kính, bờ sông Hương và các cung đồi thơ mộng của Cố đô." : locale === "zh-CN" ? "沿着古城街道、香江河畔与顺化秀美山丘的真实奔跑。" : locale === "ja" ? "古都の街並み、フォーン川沿い、そして緑豊かな丘陵を駆け抜ける実際のランニングシーン。" : "Real community strides through ancient citadel avenues, Huong riverbanks, and scenic hills."}
+            action={{ label: common("viewAll"), href: localePath(locale, "/community") }}
+          />
+          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+            {[
+              { img: "/images/hero-running.jpg", label: "Huong River Sunrise", caption: "Sông Hương" },
+              { img: "/images/route-kinh-thanh.jpg", label: "Citadel Loop", caption: "Kinh Thành" },
+              { img: "/images/route-vong-canh.jpg", label: "Vong Canh Pine Trail", caption: "Đồi Vọng Cảnh" },
+              { img: "/images/community-1.jpg", label: "Mythos Runners", caption: "CLB Mythos" },
+            ].map((pic, idx) => (
+              <div key={idx} className="group relative overflow-hidden rounded-xl border border-line bg-surface aspect-[4/3]">
+                <img
+                  src={pic.img}
+                  alt={pic.label}
+                  className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-canvas/90 via-canvas/20 to-transparent" />
+                <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
+                  <span className="font-display text-xs font-semibold text-ink drop-shadow-sm">{pic.caption}</span>
+                  <span className="font-mono text-[0.55rem] uppercase tracking-[0.14em] text-accent backdrop-blur bg-canvas/80 px-2 py-0.5 rounded-full">{pic.label}</span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>

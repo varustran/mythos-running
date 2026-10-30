@@ -10,10 +10,16 @@ export function RouteCard({ route, locale, index = 1 }: { route: RunningRoute; l
   const t = getT(locale, "routes");
   const common = getT(locale, "common");
 
+  const routeImages: Record<string, string> = {
+    "kinh-thanh-hue-loop": "/images/route-kinh-thanh.jpg",
+    "song-huong-thien-mu": "/images/route-song-huong.jpg",
+    "doi-vong-canh": "/images/route-vong-canh.jpg",
+  };
+
   return (
     <Link href={`/${locale}/routes/${route.slug}`} className="group card card-hover overflow-hidden">
       <div className="relative">
-        <Artwork seed={index + 1} label={t("communityRating")} className="aspect-[16/9] w-full" />
+        <Artwork seed={index + 1} image={routeImages[route.slug]} label={t("communityRating")} className="aspect-[16/9] w-full" />
         <Badge tone="teal" className="absolute left-4 top-4 bg-canvas/85 backdrop-blur">
           {common(route.difficulty)}
         </Badge>

@@ -43,7 +43,7 @@ export default async function CommunityPage({ params }: { params: Promise<{ loca
 
   return (
     <>
-      <PageHero eyebrow="Mythos Community" title={t("title")} description={t("desc")}>
+      <PageHero eyebrow="Mythos Community" title={t("title")} description={t("desc")} image="/images/community-1.jpg">
         <Link href={localePath(locale, profile ? "/admin" : "/login")} className={buttonStyles("primary", "md")}>
           {profile ? t("features.profile") : t("loginCta")}
           <ArrowRight className="h-4 w-4" />
