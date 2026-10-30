@@ -5,6 +5,7 @@ import { getT } from "@/lib/i18n/server";
 import { buildMetadata } from "@/lib/seo";
 import { PageHero } from "@/components/content/PageHero";
 import { AcademyBrowser } from "@/components/content/AcademyBrowser";
+import { RunnerQuiz } from "@/components/tools/RunnerQuiz";
 import { articles } from "@/data/articles";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
@@ -31,6 +32,9 @@ export default async function AcademyPage({
     <>
       <PageHero eyebrow="Mythos Academy" title={t("title")} description={t("desc")} image="/images/academy-training.jpg" />
       <AcademyBrowser articles={articles} locale={locale} query={q} />
+      <section className="container-page pb-20 pt-8 max-w-3xl">
+        <RunnerQuiz locale={locale} />
+      </section>
     </>
   );
 }

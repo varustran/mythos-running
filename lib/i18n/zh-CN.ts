@@ -1,4 +1,4 @@
-﻿import type { Dictionary } from "./vi";
+import type { Dictionary } from "./vi";
 
 export const zhCN: Dictionary = {
   common: {
@@ -106,6 +106,7 @@ export const zhCN: Dictionary = {
     gear: "装备",
     community: "社区",
     labs: "Mythos Labs",
+    game: "The Last Route",
     about: "关于",
     contact: "联系",
     admin: "管理",

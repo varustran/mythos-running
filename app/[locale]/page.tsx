@@ -10,6 +10,8 @@ import {
   HeartPulse,
   MapPin,
   ChevronRight,
+  Sparkles,
+  Play,
 } from "lucide-react";
 import { notFound } from "next/navigation";
 import { isLocale, localePath, type Locale } from "@/lib/i18n/settings";
@@ -246,6 +248,66 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
               {featuredRoutes.map((route, index) => (
                 <RouteCard key={route.slug} route={route} locale={locale} index={index + 2} />
               ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 06 — Mythos Original Game Showcase */}
+      <section className="border-b border-line bg-[#03060E] py-16 sm:py-20 text-white relative overflow-hidden">
+        <div className="absolute inset-0 z-0">
+          <img
+            src="/images/game-hero.jpg"
+            alt="Mythos: The Last Route"
+            className="h-full w-full object-cover opacity-25 filter brightness-75"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#03060E] via-[#03060E]/70 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#03060E] via-[#03060E]/90 to-transparent" />
+        </div>
+
+        <div className="container-page relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+          <div className="max-w-xl">
+            <span className="inline-flex items-center gap-2 rounded-full border border-teal/40 bg-teal/10 px-3 py-1 font-mono text-xs font-medium text-teal">
+              <Sparkles className="h-3.5 w-3.5 animate-spin" style={{ animationDuration: "5s" }} />
+              MYTHOS ORIGINAL GAME · CHƠI TRÊN WEB
+            </span>
+            <h2 className="mt-4 font-display text-3xl sm:text-5xl font-bold tracking-tight text-white leading-tight">
+              {locale === "vi" ? "Mythos: Dấu Chân Cuối Cùng" : "Mythos: The Last Route"}
+            </h2>
+            <p className="mt-4 text-sm sm:text-base leading-relaxed text-[#A7B4C7]">
+              {locale === "vi"
+                ? "Tựa game phiêu lưu tường thuật 8 chương lấy bối cảnh Cố Đô Huế. Chạy qua những cung đường ẩn giấu, thu thập mảnh ký ức và giải mã bí mật trong đêm."
+                : "An 8-chapter narrative running adventure through mysterious phantom avenues in ancient Hue. Run, collect memory shards, and uncover the city's lost routes."}
+            </p>
+            <div className="mt-6 flex flex-wrap items-center gap-4">
+              <Link
+                href={localePath(locale, "/game/play")}
+                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-teal to-accent px-6 py-3 text-sm font-semibold text-black hover:opacity-95 transition shadow-lg shadow-teal/20"
+              >
+                <Play className="h-4 w-4 fill-current" />
+                {locale === "vi" ? "Chơi Ngay (Miễn Phí)" : "Play Online (Free)"}
+              </Link>
+              <Link
+                href={localePath(locale, "/game")}
+                className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-5 py-3 text-sm font-medium text-white hover:border-teal transition backdrop-blur"
+              >
+                {locale === "vi" ? "Xem 8 Chương Cốt Truyện" : "Explore 8 Chapters"}
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+
+          <div className="relative aspect-[16/10] w-full max-w-md lg:max-w-lg rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
+            <img
+              src="/images/game-chapter-1.jpg"
+              alt="The Last Route Screenshot"
+              className="h-full w-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end p-5">
+              <div>
+                <p className="font-mono text-[0.68rem] uppercase tracking-wider text-teal">Chapter 1 Preview</p>
+                <p className="font-display text-base font-semibold text-white">Hào Thành Lúc Nửa Đêm · Midnight Citadel</p>
+              </div>
             </div>
           </div>
         </div>

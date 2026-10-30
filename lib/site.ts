@@ -22,6 +22,7 @@ export const navItems = [
   { key: "gear", href: "/gear" },
   { key: "community", href: "/community" },
   { key: "labs", href: "/labs" },
+  { key: "game", href: "/game" },
 ] as const;
 
 export const footerGroups = [
@@ -33,6 +34,7 @@ export const footerGroups = [
       { label: "Events", href: "/events" },
       { label: "Routes", href: "/routes" },
       { label: "Gear", href: "/gear" },
+      { label: "The Last Route", href: "/game" },
     ],
   },
   {

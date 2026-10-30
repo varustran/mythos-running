@@ -1,4 +1,4 @@
-﻿export const vi = {
+export const vi = {
   common: {
     brand: "Mythos Running",
     tagline: "Hệ sinh thái số cho mọi người chạy",
@@ -105,6 +105,7 @@
     gear: "Trang bị",
     community: "Cộng đồng",
     labs: "Mythos Labs",
+    game: "The Last Route",
     about: "Giới thiệu",
     contact: "Liên hệ",
     admin: "Quản trị",

@@ -1,4 +1,4 @@
-﻿import type { Dictionary } from "./vi";
+import type { Dictionary } from "./vi";
 
 export const ja: Dictionary = {
   common: {
@@ -107,6 +107,7 @@ export const ja: Dictionary = {
     gear: "ギア",
     community: "コミュニティ",
     labs: "Mythos Labs",
+    game: "The Last Route",
     about: "概要",
     contact: "お問い合わせ",
     admin: "管理",
