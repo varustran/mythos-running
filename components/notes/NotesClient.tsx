@@ -89,7 +89,7 @@ export function NotesClient({ locale }: { locale: Locale }) {
           <div className="flex items-center gap-2">
             <FileText className="h-4 w-4 text-accent" />
             <span className="font-mono text-xs uppercase tracking-wider text-accent font-semibold">
-              MYSO NOTES (NOTE2S ED.)
+              MYSO NOTES
             </span>
           </div>
           <div className="font-mono text-xs text-subtle space-x-3">

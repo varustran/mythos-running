@@ -17,9 +17,8 @@ export function Logo({ className, href = "/" }: { className?: string; href?: str
           <circle cx="27" cy="8" r="2.4" fill="rgb(var(--accent))" />
         </svg>
       </span>
-      <span className="flex flex-col leading-none">
-        <span className="font-display text-[1.05rem] font-bold tracking-tight text-ink">Mythos</span>
-        <span className="font-mono text-[0.55rem] uppercase tracking-[0.24em] text-accent font-semibold">RUNNING</span>
+      <span className="flex items-center gap-1.5 leading-none">
+        <span className="font-display text-[1.2rem] font-bold tracking-tight text-ink">Myso</span>
       </span>
     </Link>
   );

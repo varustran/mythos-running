@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, Send, Plus, Trash2, ShieldCheck, AlertCircle, Sparkles } from "lucide-react";
 import type { Locale } from "@/lib/i18n/settings";
 import { localePath } from "@/lib/i18n/settings";
+import { TipTapEditor } from "@/components/editor/TipTapEditor";
 
 export function WikiProposeClient({ locale }: { locale: Locale }) {
   const router = useRouter();
@@ -151,15 +152,14 @@ export function WikiProposeClient({ locale }: { locale: Locale }) {
 
           <div>
             <label className="block font-mono text-xs text-subtle uppercase tracking-wider mb-2">
-              Nội dung chi tiết (Định dạng Markdown) *
+              Nội dung bách khoa chi tiết (Trình soạn thảo WYSIWYG) *
             </label>
-            <textarea
-              rows={8}
-              required
+            <TipTapEditor
               value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Nhập nội dung bách khoa chi tiết, phân mục, định nghĩa, cơ chế hoạt động..."
-              className="w-full rounded-xl border border-line bg-canvas p-3 text-sm text-ink font-mono focus:border-accent focus:outline-none transition"
+              onChange={setContent}
+              locale={locale}
+              placeholder="Nhập nội dung bách khoa chi tiết, phân mục, định nghĩa, cơ chế hoạt động, bảng biểu..."
+              minHeight="220px"
             />
           </div>
 

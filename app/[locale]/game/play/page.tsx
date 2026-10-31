@@ -10,10 +10,10 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const { locale } = await params;
   if (!isLocale(locale)) return {};
   const titles = {
-    vi: "Chơi Ngay — Mythos: Dấu Chân Cuối Cùng",
-    en: "Play Now — Mythos: The Last Route",
-    "zh-CN": "立即畅玩 — Mythos：最后的路",
-    ja: "今すぐプレイ — Mythos：最後のルート",
+    vi: "Chơi Ngay — Myso: Dấu Chân Cuối Cùng",
+    en: "Play Now — Myso: The Last Route",
+    "zh-CN": "立即畅玩 — Myso：最后的路",
+    ja: "今すぐプレイ — Myso：最後のルート",
   };
 
   return buildMetadata({
@@ -58,7 +58,7 @@ export default async function GamePlayPage({ params }: { params: Promise<{ local
 
       {/* Bottom Mini Bar */}
       <footer className="border-t border-white/10 bg-[#03060E] px-4 py-2.5 sm:px-8 text-center text-xs text-white/50 font-mono">
-        Mythos Running © 2026 · Hue, Vietnam · Designed with Web Audio & HTML5 Canvas
+        Myso © 2026 · Hue, Vietnam · Designed with Web Audio & HTML5 Canvas
       </footer>
     </div>
   );

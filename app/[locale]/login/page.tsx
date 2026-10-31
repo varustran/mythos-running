@@ -60,7 +60,7 @@ export default async function LoginPage({ params }: { params: Promise<{ locale: 
 
             <div>
               <h1 className="font-display text-xl sm:text-2xl font-bold text-ink">
-                {profile.fullName || "Thành viên Mythos"}
+                {profile.fullName || "Thành viên Myso"}
               </h1>
               <p className="font-mono text-xs text-muted mt-1">{profile.email}</p>
               <span className="inline-block mt-2 font-mono text-[0.68rem] uppercase tracking-wider text-accent border border-accent/40 bg-accent/10 px-2.5 py-0.5 rounded-full font-bold">

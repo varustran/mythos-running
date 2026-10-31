@@ -67,7 +67,7 @@ export default async function ArticlePage({
           <div className="container-page relative py-12 sm:py-16">
             <Breadcrumbs
               items={[
-                { label: "Mythos", href: localePath(locale) },
+                { label: "Myso", href: localePath(locale) },
                 { label: t("title"), href: localePath(locale, "/academy") },
                 { label: article.title[locale] },
               ]}
@@ -176,7 +176,7 @@ export default async function ArticlePage({
       />
       <JsonLd
         data={breadcrumbSchema([
-          { name: "Mythos", url: absoluteUrl(`/${locale}`) },
+          { name: "Myso", url: absoluteUrl(`/${locale}`) },
           { name: t("title"), url: absoluteUrl(`/${locale}/academy`) },
           { name: article.title[locale], url },
         ])}

@@ -171,7 +171,7 @@ export function SearchDialog({
           )}
         </div>
         <div className="flex items-center justify-between border-t border-line px-4 py-2.5 font-mono text-[0.6rem] uppercase tracking-[0.14em] text-subtle">
-          <span>Mythos Running</span>
+          <span>Myso</span>
           <span className={cn("hidden sm:inline")}>ESC</span>
         </div>
       </div>

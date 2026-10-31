@@ -1,6 +1,6 @@
-# Mythos Running
+# Myso
 
-A production-grade, multilingual website for runners: training academy, 15 working calculators, race calendar, Hue running routes, gear reviews, community, and Mythos Labs experiments.
+A production-grade, modern social platform & open knowledge base: rich WYSIWYG publishing, federated encyclopedia, threaded discussions, communities, encrypted messaging, and creator tools.
 
 Built with Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS, i18next, next-themes, and Supabase.
 

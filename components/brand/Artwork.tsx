@@ -39,7 +39,7 @@ export function Artwork({
         <>
           <img
             src={selectedImage}
-            alt={label || "Mythos Running"}
+            alt={label || "Myso"}
             className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
             loading="lazy"
           />

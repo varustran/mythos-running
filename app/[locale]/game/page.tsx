@@ -11,16 +11,16 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const { locale } = await params;
   if (!isLocale(locale)) return {};
   const titles = {
-    vi: "Mythos: Dấu Chân Cuối Cùng — Trò chơi phiêu lưu chạy bộ",
-    en: "Mythos: The Last Route — Narrative Running Adventure Game",
-    "zh-CN": "Mythos：最后的路 — 叙事跑步冒险游戏",
-    ja: "Mythos：最後のルート — ランニング叙事詩アドベンチャー",
+    vi: "Myso: Dấu Chân Cuối Cùng — Trò chơi phiêu lưu chạy bộ",
+    en: "Myso: The Last Route — Narrative Running Adventure Game",
+    "zh-CN": "Myso：最后的路 — 叙事跑步冒险游戏",
+    ja: "Myso：最後のルート — ランニング叙事詩アドベンチャー",
   };
   const descriptions = {
-    vi: "Khám phá những cung đường huyền bí chỉ xuất hiện trong màn sương đêm tại Huế. Một tựa game phiêu lưu độc bản từ Mythos Running.",
-    en: "Explore mystical phantom routes that emerge only in Hue's midnight mist. An original narrative running game by Mythos Running.",
-    "zh-CN": "探索仅在顺化午夜浓雾中显现的幽冥古道。Mythos Running 原创叙事跑步冒险游戏。",
-    ja: "真夜中のフエの霧の中にのみ現れる幻の古道を探索せよ。Mythos Runningがお届けするオリジナル・ランニングアドベンチャー。",
+    vi: "Khám phá những cung đường huyền bí chỉ xuất hiện trong màn sương đêm tại Huế. Một tựa game phiêu lưu độc bản từ Myso.",
+    en: "Explore mystical phantom routes that emerge only in Hue's midnight mist. An original narrative running game by Myso.",
+    "zh-CN": "探索仅在顺化午夜浓雾中显现的幽冥古道。Myso 原创叙事跑步冒险游戏。",
+    ja: "真夜中のフエの霧の中にのみ現れる幻の古道を探索せよ。Mysoがお届けするオリジナル・ランニングアドベンチャー。",
   };
 
   return buildMetadata({
@@ -79,7 +79,7 @@ export default async function GameHubPage({ params }: { params: Promise<{ locale
         <div className="absolute inset-0 z-0">
           <img
             src="/images/game-hero.jpg"
-            alt="Mythos: The Last Route"
+            alt="Myso: The Last Route"
             className="h-full w-full object-cover opacity-35 filter brightness-90"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#040814] via-[#040814]/60 to-transparent" />
@@ -203,7 +203,7 @@ export default async function GameHubPage({ params }: { params: Promise<{ locale
         </div>
       </section>
 
-      {/* 4. Characters of Mythos */}
+      {/* 4. Characters of Myso */}
       <section className="border-t border-line bg-surface/30 py-16 sm:py-24">
         <div className="container-page">
           <div className="mb-12 max-w-xl">

@@ -35,7 +35,7 @@ export default async function GearPage({
 
   return (
     <>
-      <PageHero eyebrow="Mythos Gear" title={t("title")} description={t("desc")} image="/images/gear-shoes.jpg" />
+      <PageHero eyebrow="Myso Gear" title={t("title")} description={t("desc")} image="/images/gear-shoes.jpg" />
       <div className="container-page py-12 sm:py-16">
         <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
           <Link

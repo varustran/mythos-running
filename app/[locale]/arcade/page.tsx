@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     locale,
     path: "arcade",
     title: titles[locale as Locale] || titles.en,
-    description: "Explore Myso browser game studio: Mythos Running narrative adventure, Cyber Dash neon arcade, and continuous game releases.",
+    description: "Explore Myso browser game studio: Myso narrative adventure, Cyber Dash neon arcade, and continuous game releases.",
   });
 }
 
@@ -71,7 +71,7 @@ export default async function ArcadeHubPage({ params }: { params: Promise<{ loca
         </div>
       </section>
 
-      {/* 2. Featured Game 2: Mythos: The Last Route */}
+      {/* 2. Featured Game 2: Myso: The Last Route */}
       <section className="border-t border-line bg-surface/30 py-16 sm:py-20">
         <div className="container-page">
           <div className="card overflow-hidden border border-teal/30 bg-[#040916] text-white p-8 sm:p-12 shadow-2xl relative">
@@ -81,7 +81,7 @@ export default async function ArcadeHubPage({ params }: { params: Promise<{ loca
                 NARRATIVE ADVENTURE · 8 CHAPTERS
               </span>
               <h3 className="mt-4 font-display text-3xl sm:text-4xl font-bold text-white">
-                Mythos: Dấu Chân Cuối Cùng
+                Myso: Dấu Chân Cuối Cùng
               </h3>
               <p className="mt-3 text-sm sm:text-base text-[#A7B4C7] leading-relaxed">
                 Tựa game phiêu lưu tường thuật độc bản 8 chương. Đồng hành cùng runner An giải mã bí mật những con đường cổ kính trong màn sương đêm, thu thập mảnh ký ức và khám phá 3 nhánh kết thúc vận mệnh.

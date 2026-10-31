@@ -192,7 +192,7 @@ export function LoginForm({ locale }: { locale: string }) {
     // Check reserved admin username
     if (cleanUsername === "myso" && email.toLowerCase() !== "chuitv1907@gmail.com") {
       setStatus("error");
-      setStatusMsg("Tên định danh @myso dành riêng cho Quản trị viên hệ sinh thái Mythos Running.");
+      setStatusMsg("Tên định danh @myso dành riêng cho Quản trị viên hệ sinh thái Myso.");
       return;
     }
 
@@ -225,7 +225,7 @@ export function LoginForm({ locale }: { locale: string }) {
         full_name: fullName.trim() || cleanUsername,
         username: cleanUsername,
         avatar_url: selectedAvatar,
-        bio: bio.trim() || "Thành viên mới của cộng đồng Mythos Running.",
+        bio: bio.trim() || "Thành viên mới của cộng đồng Myso.",
         verified: email.toLowerCase() === "chuitv1907@gmail.com",
         role: email.toLowerCase() === "chuitv1907@gmail.com" ? "admin" : "user",
         streak_days: 1,
@@ -233,7 +233,7 @@ export function LoginForm({ locale }: { locale: string }) {
     } catch {}
 
     setStatus("verified");
-    setStatusMsg("Tạo tài khoản thành công! Đang tự động chuyển hướng vào Mythos Running...");
+    setStatusMsg("Tạo tài khoản thành công! Đang tự động chuyển hướng vào Myso...");
     setTimeout(() => {
       window.location.href = `/${locale}`;
     }, 800);
@@ -304,7 +304,7 @@ export function LoginForm({ locale }: { locale: string }) {
         <div className="flex items-center gap-2">
           <ShieldCheck className="h-4 w-4 text-accent" />
           <span className="font-mono text-xs uppercase tracking-wider text-accent font-semibold">
-            MYTHOS RUNNING IDENTITY & AUTH
+            MYSO IDENTITY & AUTH
           </span>
         </div>
         <span className="font-mono text-[0.65rem] text-teal border border-teal/40 bg-teal/10 px-2 py-0.5 rounded-full font-bold">
@@ -360,9 +360,9 @@ export function LoginForm({ locale }: { locale: string }) {
 
       <h1 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-ink">
         {activeTab === "login"
-          ? "Chào mừng trở lại với Mythos Running"
+          ? "Chào mừng trở lại với Myso"
           : activeTab === "register"
-          ? "Tạo tài khoản cộng đồng Mythos Running"
+          ? "Tạo tài khoản cộng đồng Myso"
           : "Xác thực hai lớp (2FA)"}
       </h1>
       <p className="mt-1 text-xs sm:text-sm text-muted leading-relaxed">
@@ -557,7 +557,7 @@ export function LoginForm({ locale }: { locale: string }) {
             className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3 text-xs sm:text-sm font-semibold text-white transition hover:bg-accent/90 disabled:opacity-50 dark:text-[#04101F] shadow-lg active:scale-[0.99]"
           >
             {status === "sending" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
-            Đăng Nhập Vào Mythos Running
+            Đăng Nhập Vào Myso
           </button>
         </form>
       ) : (

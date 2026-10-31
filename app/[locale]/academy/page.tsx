@@ -30,7 +30,7 @@ export default async function AcademyPage({
 
   return (
     <>
-      <PageHero eyebrow="Mythos Academy" title={t("title")} description={t("desc")} image="/images/academy-training.jpg" />
+      <PageHero eyebrow="Myso Academy" title={t("title")} description={t("desc")} image="/images/academy-training.jpg" />
       <AcademyBrowser articles={articles} locale={locale} query={q} />
       <section className="container-page pb-20 pt-8 max-w-3xl">
         <RunnerQuiz locale={locale} />

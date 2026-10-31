@@ -33,7 +33,7 @@ export default async function ToolsPage({
 
   return (
     <>
-      <PageHero eyebrow="Mythos Tools" title={t("title")} description={t("desc")} />
+      <PageHero eyebrow="Myso Tools" title={t("title")} description={t("desc")} />
       <div className="container-page py-12 sm:py-16">
         <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
           <Link

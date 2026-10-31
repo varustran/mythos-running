@@ -13,7 +13,7 @@ export const legalDocs: Record<LegalDocKey, LegalDoc> = {
     body: {
       vi: `## Dữ liệu chúng tôi thu thập
 
-Mythos Running chỉ thu thập dữ liệu bạn tự nguyện cung cấp: email khi đăng ký bản tin hoặc đăng nhập, thông tin hồ sơ chạy bộ và nội dung bạn gửi qua biểu mẫu liên hệ. Chúng tôi không bán dữ liệu cá nhân.
+Myso chỉ thu thập dữ liệu bạn tự nguyện cung cấp: email khi đăng ký bản tin hoặc đăng nhập, thông tin hồ sơ chạy bộ và nội dung bạn gửi qua biểu mẫu liên hệ. Chúng tôi không bán dữ liệu cá nhân.
 
 ## Cách dữ liệu được sử dụng
 
@@ -28,7 +28,7 @@ Dữ liệu được lưu trên hạ tầng Supabase. Chúng tôi áp dụng ki�
 Bạn có thể yêu cầu truy cập, chỉnh sửa hoặc xóa dữ liệu qua biểu mẫu liên hệ. Yêu cầu xóa tài khoản sẽ xóa hồ sơ và dữ liệu liên quan, trừ dữ liệu phải giữ theo quy định pháp luật.`,
       en: `## What we collect
 
-Mythos Running only collects data you voluntarily provide: your email when you subscribe or sign in, running profile details and messages you send through the contact form. We do not sell personal data.
+Myso only collects data you voluntarily provide: your email when you subscribe or sign in, running profile details and messages you send through the contact form. We do not sell personal data.
 
 ## How data is used
 
@@ -43,7 +43,7 @@ Data is stored on Supabase infrastructure. We apply access controls and never st
 You may request access, correction or deletion through the contact form. Deleting your account removes your profile and related data, except records we must retain by law.`,
       "zh-CN": `## 我们收集的数据
 
-Mythos Running 仅收集你主动提供的数据：订阅或登录时的邮箱、跑步档案信息，以及通过联系表单发送的内容。我们不会出售个人数据。
+Myso 仅收集你主动提供的数据：订阅或登录时的邮箱、跑步档案信息，以及通过联系表单发送的内容。我们不会出售个人数据。
 
 ## 数据用途
 
@@ -58,7 +58,7 @@ Mythos Running 仅收集你主动提供的数据：订阅或登录时的邮箱�
 你可以通过联系表单请求访问、更正或删除数据。删除账户将移除档案及相关数据，但法律要求保留的记录除外。`,
       ja: `## 収集するデータ
 
-Mythos Running は、ニュースレター登録やサインイン時のメールアドレス、ランニングプロフィール、お問い合わせフォームで送信された内容など、ご自身が提供したデータのみを収集します。個人データを販売することはありません。
+Myso は、ニュースレター登録やサインイン時のメールアドレス、ランニングプロフィール、お問い合わせフォームで送信された内容など、ご自身が提供したデータのみを収集します。個人データを販売することはありません。
 
 ## データの利用目的
 
@@ -78,7 +78,7 @@ Mythos Running は、ニュースレター登録やサインイン時のメー�
     body: {
       vi: `## Chấp nhận điều khoản
 
-Khi sử dụng Mythos Running, bạn đồng ý với các điều khoản này. Nếu không đồng ý, vui lòng không sử dụng dịch vụ.
+Khi sử dụng Myso, bạn đồng ý với các điều khoản này. Nếu không đồng ý, vui lòng không sử dụng dịch vụ.
 
 ## Nội dung và công cụ
 
@@ -90,10 +90,10 @@ Bạn chịu trách nhiệm bảo mật thông tin đăng nhập và mọi hoạ
 
 ## Giới hạn trách nhiệm
 
-Nội dung được cung cấp "nguyên trạng". Trong phạm vi pháp luật cho phép, Mythos Running không chịu trách nhiệm cho thiệt hại phát sinh từ việc sử dụng nội dung hoặc công cụ. Chúng tôi có thể cập nhật điều khoản và sẽ ghi ngày cập nhật mới.`,
+Nội dung được cung cấp "nguyên trạng". Trong phạm vi pháp luật cho phép, Myso không chịu trách nhiệm cho thiệt hại phát sinh từ việc sử dụng nội dung hoặc công cụ. Chúng tôi có thể cập nhật điều khoản và sẽ ghi ngày cập nhật mới.`,
       en: `## Acceptance
 
-By using Mythos Running you agree to these terms. If you do not agree, please do not use the service.
+By using Myso you agree to these terms. If you do not agree, please do not use the service.
 
 ## Content and tools
 
@@ -105,10 +105,10 @@ You are responsible for keeping your credentials secure and for all activity und
 
 ## Liability and changes
 
-Content is provided "as is". To the extent permitted by law, Mythos Running is not liable for damages arising from use of the content or tools. We may update these terms and will publish the new update date.`,
+Content is provided "as is". To the extent permitted by law, Myso is not liable for damages arising from use of the content or tools. We may update these terms and will publish the new update date.`,
       "zh-CN": `## 接受条款
 
-使用 Mythos Running 即表示你同意本条款。如不同意，请勿使用本服务。
+使用 Myso 即表示你同意本条款。如不同意，请勿使用本服务。
 
 ## 内容与工具
 
@@ -120,10 +120,10 @@ Content is provided "as is". To the extent permitted by law, Mythos Running is n
 
 ## 责任与变更
 
-内容按“现状”提供。在法律允许范围内，Mythos Running 不对使用内容或工具产生的损害承担责任。我们可能更新条款，并公布新的更新日期。`,
+内容按“现状”提供。在法律允许范围内，Myso 不对使用内容或工具产生的损害承担责任。我们可能更新条款，并公布新的更新日期。`,
       ja: `## 規約への同意
 
-Mythos Running を利用することで、本規約に同意したものとみなします。同意できない場合はご利用をお控えください。
+Myso を利用することで、本規約に同意したものとみなします。同意できない場合はご利用をお控えください。
 
 ## コンテンツとツール
 
@@ -135,7 +135,7 @@ Mythos Running を利用することで、本規約に同意したものとみ�
 
 ## 責任と変更
 
-コンテンツは現状のまま提供されます。法律で認められる範囲で、Mythos Running はコンテンツやツールの利用により生じた損害に責任を負いません。規約は更新される場合があり、新しい更新日を掲載します。`,
+コンテンツは現状のまま提供されます。法律で認められる範囲で、Myso はコンテンツやツールの利用により生じた損害に責任を負いません。規約は更新される場合があり、新しい更新日を掲載します。`,
     },
   },
   "editorial-policy": {
@@ -143,7 +143,7 @@ Mythos Running を利用することで、本規約に同意したものとみ�
     body: {
       vi: `## Nguyên tắc biên tập
 
-Mythos Running ưu tiên sự rõ ràng, trung thực và khả năng kiểm chứng. Chúng tôi không trình bày giả thuyết như kết luận và không tạo số liệu, giải chạy hay đánh giá sản phẩm không có thật.
+Myso ưu tiên sự rõ ràng, trung thực và khả năng kiểm chứng. Chúng tôi không trình bày giả thuyết như kết luận và không tạo số liệu, giải chạy hay đánh giá sản phẩm không có thật.
 
 ## Nguồn và kiểm chứng
 
@@ -158,7 +158,7 @@ Nội dung được biên soạn, rà soát và cập nhật bởi nhóm biên t
 Khi phát hiện lỗi, chúng tôi sửa và ghi ngày cập nhật. Nội dung thương mại, nếu có, được công bố rõ. Liên kết tiếp thị không quyết định kết luận đánh giá.`,
       en: `## Editorial principles
 
-Mythos Running prioritises clarity, honesty and verifiability. We do not present hypotheses as conclusions, and we do not invent statistics, races or product reviews.
+Myso prioritises clarity, honesty and verifiability. We do not present hypotheses as conclusions, and we do not invent statistics, races or product reviews.
 
 ## Sources and verification
 
@@ -173,7 +173,7 @@ Content is written, reviewed and updated by the Mythos editorial team. Sensitive
 When we find an error, we correct it and publish the update date. Commercial relationships, if any, are disclosed. Affiliate links never determine review conclusions.`,
       "zh-CN": `## 编辑原则
 
-Mythos Running 重视清晰、诚实与可验证性。我们不会把假设当作结论，也不会编造统计数据、赛事或产品评测。
+Myso 重视清晰、诚实与可验证性。我们不会把假设当作结论，也不会编造统计数据、赛事或产品评测。
 
 ## 来源与验证
 
@@ -188,7 +188,7 @@ Mythos Running 重视清晰、诚实与可验证性。我们不会把假设当�
 发现错误时，我们会更正并公布更新日期。如有商业关系，将予以披露。联盟链接不会决定评测结论。`,
       ja: `## 編集方針
 
-Mythos Running は明瞭さ、誠実さ、検証可能性を重視します。仮説を結論として提示せず、統計、大会、製品レビューを捏造しません。
+Myso は明瞭さ、誠実さ、検証可能性を重視します。仮説を結論として提示せず、統計、大会、製品レビューを捏造しません。
 
 ## 情報源と検証
 

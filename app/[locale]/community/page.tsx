@@ -43,7 +43,7 @@ export default async function CommunityPage({ params }: { params: Promise<{ loca
 
   return (
     <>
-      <PageHero eyebrow="Mythos Community" title={t("title")} description={t("desc")} image="/images/community-1.jpg">
+      <PageHero eyebrow="Myso Community" title={t("title")} description={t("desc")} image="/images/community-1.jpg">
         <Link href={localePath(locale, profile ? "/admin" : "/login")} className={buttonStyles("primary", "md")}>
           {profile ? t("features.profile") : t("loginCta")}
           <ArrowRight className="h-4 w-4" />
@@ -94,7 +94,7 @@ export default async function CommunityPage({ params }: { params: Promise<{ loca
                     {profiles.map((item, index) => (
                       <tr key={item.id} className="border-b border-line/70 last:border-0">
                         <td className="py-2.5 pr-4 font-mono text-muted">{index + 1}</td>
-                        <td className="py-2.5 pr-4 text-ink">{item.full_name || "Mythos Runner"}</td>
+                        <td className="py-2.5 pr-4 text-ink">{item.full_name || "Myso Runner"}</td>
                         <td className="py-2.5 pr-4 text-muted">—</td>
                         <td className="py-2.5 pr-4 text-muted">—</td>
                       </tr>

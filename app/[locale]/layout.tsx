@@ -6,6 +6,7 @@ import { getT } from "@/lib/i18n/server";
 import { buildMetadata, JsonLd, organizationSchema, websiteSchema } from "@/lib/seo";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { I18nProvider } from "@/components/providers/I18nProvider";
+import { AuthProvider } from "@/components/providers/AuthProvider";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { MobileBottomBar } from "@/components/layout/MobileBottomBar";
@@ -20,28 +21,29 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const t = getT(l, "home");
   const meta = buildMetadata({
     locale: l,
-    title: "Mythos Running — Nền Tảng Xuất Bản & Kết Nối Cộng Đồng Chạy Bộ Toàn Cầu",
-    description: "Không gian xuất bản bài viết chuyên nghiệp, khoa học chạy bộ, công cụ tính toán và kết nối cộng đồng runners quốc tế.",
+    title: "Myso — Nền Tảng Cộng Đồng & Xuất Bản Tri Thức Hiện Đại",
+    description: "Không gian kết nối cộng đồng, viết bài chuẩn WYSIWYG, thảo luận đa chiều và bách khoa mở.",
   });
   return {
     ...meta,
     title: {
-      default: "Mythos Running — Nền Tảng Chạy Bộ & Xuất Bản Tri Thức Thể Thao",
-      template: "%s · Mythos Running",
+      default: "Myso — Nền Tảng Cộng Đồng & Xuất Bản Tri Thức Hiện Đại",
+      template: "%s · Myso",
     },
-    applicationName: "Mythos Running",
-    authors: [{ name: "Mythos Running Collective" }],
-    creator: "Mythos Running",
+    applicationName: "Myso",
+    authors: [{ name: "Myso Community" }],
+    creator: "Myso",
     keywords: [
-      "mythos running",
-      "chạy bộ",
-      "marathon",
-      "running science",
-      "cộng đồng chạy bộ",
-      "rich text editor",
-      "pace calculator",
-      "strava",
-      "thể thao",
+      "myso",
+      "mạng xã hội",
+      "cộng đồng",
+      "diễn đàn",
+      "wiki",
+      "wysiwyg editor",
+      "threads",
+      "reddit",
+      "xuất bản bài viết",
+      "trò chuyện mã hóa",
     ],
     icons: {
       icon: [
@@ -88,20 +90,22 @@ export default async function LocaleLayout({
       <body className="pb-16 lg:pb-0">
         <ThemeProvider>
           <I18nProvider locale={locale}>
-            <a
-              href="#main"
-              className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-full focus:bg-accent focus:px-4 focus:py-2 focus:text-sm focus:text-white"
-            >
-              {t("skipToContent")}
-            </a>
-            <div className="flex min-h-screen flex-col">
-              <SiteHeader locale={locale} />
-              <main id="main" className="flex-1">
-                {children}
-              </main>
-              <SiteFooter locale={locale} />
-            </div>
-            <MobileBottomBar locale={locale} />
+            <AuthProvider>
+              <a
+                href="#main"
+                className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-full focus:bg-accent focus:px-4 focus:py-2 focus:text-sm focus:text-white"
+              >
+                {t("skipToContent")}
+              </a>
+              <div className="flex min-h-screen flex-col">
+                <SiteHeader locale={locale} />
+                <main id="main" className="flex-1">
+                  {children}
+                </main>
+                <SiteFooter locale={locale} />
+              </div>
+              <MobileBottomBar locale={locale} />
+            </AuthProvider>
           </I18nProvider>
         </ThemeProvider>
         <JsonLd data={organizationSchema()} />

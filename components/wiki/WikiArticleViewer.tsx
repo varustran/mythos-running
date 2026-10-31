@@ -30,6 +30,7 @@ import {
 import type { Locale } from "@/lib/i18n/settings";
 import { localePath } from "@/lib/i18n/settings";
 import type { WikiArticleItem } from "@/lib/wiki/wikipedia";
+import { TipTapEditor } from "@/components/editor/TipTapEditor";
 
 interface RevisionLog {
   id: string;
@@ -380,141 +381,33 @@ export function WikiArticleViewer({
               </div>
             </div>
 
-            {/* Wikipedia Toolbar */}
-            {!previewMode && (
-              <div className="flex flex-wrap items-center gap-1 p-2 rounded-xl border border-line bg-canvas mb-4 text-ink">
-                <button
-                  type="button"
-                  onClick={() => insertFormatting("**", "**", "in đậm")}
-                  className="p-2 rounded hover:bg-surface transition"
-                  title="In đậm (Bold)"
-                >
-                  <Bold className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => insertFormatting("*", "*", "in nghiêng")}
-                  className="p-2 rounded hover:bg-surface transition"
-                  title="In nghiêng (Italic)"
-                >
-                  <Italic className="h-4 w-4" />
-                </button>
-                <span className="h-4 w-px bg-line mx-1" />
-                <button
-                  type="button"
-                  onClick={() => insertFormatting("## ", "", "Tiêu đề mục lớn")}
-                  className="p-2 rounded hover:bg-surface transition"
-                  title="Tiêu đề đề mục (Heading 2)"
-                >
-                  <Heading2 className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => insertFormatting("### ", "", "Tiêu đề mục phụ")}
-                  className="p-2 rounded hover:bg-surface transition"
-                  title="Tiêu đề mục con (Heading 3)"
-                >
-                  <Heading3 className="h-4 w-4" />
-                </button>
-                <span className="h-4 w-px bg-line mx-1" />
-                <button
-                  type="button"
-                  onClick={() => insertFormatting("[", "](https://...)", "Tên liên kết")}
-                  className="p-2 rounded hover:bg-surface transition"
-                  title="Thêm liên kết (Link)"
-                >
-                  <LinkIcon className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => insertFormatting("<ref>[", " Nguồn trích dẫn]</ref>", "https://...")}
-                  className="p-2 rounded hover:bg-surface transition"
-                  title="Chèn nguồn trích dẫn (<ref>)"
-                >
-                  <BookOpen className="h-4 w-4 text-teal" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => insertFormatting("> ", "", "Đoạn trích dẫn nguyên văn")}
-                  className="p-2 rounded hover:bg-surface transition"
-                  title="Khối trích dẫn (Blockquote)"
-                >
-                  <Quote className="h-4 w-4" />
-                </button>
-                <span className="h-4 w-px bg-line mx-1" />
-                <button
-                  type="button"
-                  onClick={() => insertFormatting("- ", "", "Mục danh sách")}
-                  className="p-2 rounded hover:bg-surface transition"
-                  title="Danh sách dấu chấm"
-                >
-                  <List className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => insertFormatting("1. ", "", "Mục thứ tự")}
-                  className="p-2 rounded hover:bg-surface transition"
-                  title="Danh sách đánh số"
-                >
-                  <ListOrdered className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => insertFormatting("\n| Cột 1 | Cột 2 |\n| --- | --- |\n| Dữ liệu 1 | Dữ liệu 2 |\n", "", "")}
-                  className="p-2 rounded hover:bg-surface transition"
-                  title="Chèn bảng (Table)"
-                >
-                  <TableIcon className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => insertFormatting("```\n", "\n```", "mã nguồn")}
-                  className="p-2 rounded hover:bg-surface transition"
-                  title="Khối mã (Code block)"
-                >
-                  <Code className="h-4 w-4" />
-                </button>
+            {/* Editor Area with WYSIWYG TipTap */}
+            <div className="space-y-4">
+              <div>
+                <label className="block font-mono text-[0.68rem] text-subtle uppercase tracking-wider mb-1">
+                  Tiêu đề bách khoa:
+                </label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full rounded-xl border border-line bg-canvas p-3 text-sm font-semibold text-ink focus:border-accent focus:outline-none"
+                />
               </div>
-            )}
 
-            {/* Editor Area */}
-            {!previewMode ? (
-              <div className="space-y-4">
-                <div>
-                  <label className="block font-mono text-[0.68rem] text-subtle uppercase tracking-wider mb-1">
-                    Tiêu đề bách khoa:
-                  </label>
-                  <input
-                    type="text"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    className="w-full rounded-xl border border-line bg-canvas p-3 text-sm font-semibold text-ink focus:border-accent focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-mono text-[0.68rem] text-subtle uppercase tracking-wider mb-1">
-                    Nội dung mã nguồn (Markdown / Wiki Source):
-                  </label>
-                  <textarea
-                    id="wiki-editor-textarea"
-                    rows={18}
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    className="w-full rounded-xl border border-line bg-canvas p-4 text-sm font-mono text-ink focus:border-accent focus:outline-none leading-relaxed transition"
-                  />
-                </div>
+              <div>
+                <label className="block font-mono text-[0.68rem] text-subtle uppercase tracking-wider mb-1">
+                  Nội dung bách khoa chi tiết (WYSIWYG Editor):
+                </label>
+                <TipTapEditor
+                  value={content}
+                  onChange={setContent}
+                  locale={locale}
+                  minHeight="320px"
+                  placeholder="Nhập nội dung bách khoa, đề mục, trích dẫn, bảng biểu..."
+                />
               </div>
-            ) : (
-              <div className="rounded-xl border border-line bg-canvas p-6 min-h-[350px] prose prose-slate dark:prose-invert max-w-none text-ink">
-                <h1 className="font-display text-3xl font-bold mb-4">{title}</h1>
-                {content.split("\n\n").map((para, i) => (
-                  <p key={i} className="text-sm sm:text-base text-muted leading-relaxed mb-3">
-                    {para}
-                  </p>
-                ))}
-              </div>
-            )}
+            </div>
 
             {/* Edit Summary Input (Wikipedia Standard) */}
             <div className="mt-6 pt-5 border-t border-line/60 space-y-4">

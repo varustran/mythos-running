@@ -21,7 +21,7 @@ export function LegalPage({ locale, doc }: { locale: Locale; doc: LegalDocKey })
 
   return (
     <>
-      <PageHero eyebrow="Mythos Legal" title={title} description={`${t("lastUpdated")}: ${formatDate(data.updatedAt, locale)}`} />
+      <PageHero eyebrow="Myso Legal" title={title} description={`${t("lastUpdated")}: ${formatDate(data.updatedAt, locale)}`} />
       <div className="container-page py-12 sm:py-16">
         <div className="mx-auto max-w-3xl">
           <Markdown content={data.body[locale]} />

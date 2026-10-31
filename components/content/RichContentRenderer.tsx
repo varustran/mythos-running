@@ -2,6 +2,19 @@
 
 import React, { useMemo } from "react";
 
+// Basic safe HTML sanitizer to prevent XSS while allowing rich styling
+function sanitizeHtml(html: string): string {
+  if (!html) return "";
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, "")
+    .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, "")
+    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, "")
+    .replace(/\son\w+="[^"]*"/gi, "")
+    .replace(/\son\w+='[^']*'/gi, "")
+    .replace(/javascript:[^"']*/gi, "#");
+}
+
 export function RichContentRenderer({
   content,
   className = "",
@@ -11,7 +24,46 @@ export function RichContentRenderer({
 }) {
   if (!content) return null;
 
-  // Safe structured block & inline parser
+  // Check if content is rich HTML from TipTap
+  const isHtml = useMemo(() => {
+    const trimmed = content.trim();
+    return (
+      (trimmed.startsWith("<p>") ||
+        trimmed.startsWith("<h1>") ||
+        trimmed.startsWith("<h2>") ||
+        trimmed.startsWith("<h3>") ||
+        trimmed.startsWith("<blockquote>") ||
+        trimmed.startsWith("<ul>") ||
+        trimmed.startsWith("<ol>") ||
+        trimmed.startsWith("<div") ||
+        trimmed.startsWith("<table") ||
+        trimmed.startsWith("<pre>")) &&
+      trimmed.includes("</")
+    );
+  }, [content]);
+
+  // If HTML, render sanitized HTML inside standard prose styles
+  if (isHtml) {
+    const sanitized = sanitizeHtml(content);
+    return (
+      <div
+        className={`prose dark:prose-invert max-w-none text-ink text-sm sm:text-base leading-relaxed break-words ${className}`}
+        dangerouslySetInnerHTML={{ __html: sanitized }}
+      />
+    );
+  }
+
+  // Otherwise, use structured Markdown fallback
+  return <MarkdownFallbackRenderer content={content} className={className} />;
+}
+
+function MarkdownFallbackRenderer({
+  content,
+  className = "",
+}: {
+  content: string;
+  className?: string;
+}) {
   const renderedBlocks = useMemo(() => {
     const rawLines = content.split("\n");
     const blocks: React.ReactNode[] = [];
@@ -66,8 +118,6 @@ export function RichContentRenderer({
 
     const renderInline = (text: string): React.ReactNode[] => {
       const tokens: React.ReactNode[] = [];
-      // Regex for: bold (**text**), italic (*text*), underline (<u>text</u>), strikethrough (~~text~~),
-      // code (`code`), links ([text](url)), hashtags (#tag), mentions (@user)
       const regex =
         /(\*\*[^*]+\*\*|\*[^*]+\*|<u>[^<]+<\/u>|~~[^~]+~~|`[^`]+`|\[[^\]]+\]\([^)]+\)|#[a-zA-Z0-9_\u00C0-\u024F\u1EA0-\u1EF9]+|@[a-zA-Z0-9_]+)/g;
 
@@ -100,40 +150,39 @@ export function RichContentRenderer({
           );
         } else if (raw.startsWith("~~") && raw.endsWith("~~")) {
           tokens.push(
-            <del key={`del-${match.index}`} className="line-through text-muted">
+            <span key={`s-${match.index}`} className="line-through opacity-70">
               {raw.slice(2, -2)}
-            </del>
+            </span>
           );
         } else if (raw.startsWith("`") && raw.endsWith("`")) {
           tokens.push(
             <code
               key={`c-${match.index}`}
-              className="rounded-md bg-canvas/80 px-1.5 py-0.5 font-mono text-[0.88em] text-accent border border-line"
+              className="rounded-md border border-line bg-canvas px-1.5 py-0.5 font-mono text-[0.85em] text-accent font-medium"
             >
               {raw.slice(1, -1)}
             </code>
           );
         } else if (raw.startsWith("[") && raw.includes("](") && raw.endsWith(")")) {
-          const textPart = raw.slice(1, raw.indexOf("]("));
-          const urlPart = raw.slice(raw.indexOf("](") + 2, -1);
-          // Sanitize URL
-          const safeUrl = urlPart.startsWith("http://") || urlPart.startsWith("https://") || urlPart.startsWith("/") ? urlPart : "#";
+          const split = raw.indexOf("](");
+          const linkTxt = raw.substring(1, split);
+          const linkUrl = raw.substring(split + 2, raw.length - 1);
           tokens.push(
             <a
               key={`a-${match.index}`}
-              href={safeUrl}
+              href={linkUrl}
               target="_blank"
-              rel="noopener noreferrer ugc"
-              className="text-accent underline underline-offset-2 font-medium hover:opacity-80 transition"
+              rel="noopener noreferrer"
+              className="font-medium text-accent underline underline-offset-4 transition hover:text-accent/80"
             >
-              {textPart}
+              {linkTxt}
             </a>
           );
         } else if (raw.startsWith("#")) {
           tokens.push(
             <span
               key={`h-${match.index}`}
-              className="text-accent font-semibold hover:underline cursor-pointer"
+              className="inline-block font-semibold text-accent transition hover:underline"
             >
               {raw}
             </span>
@@ -142,14 +191,14 @@ export function RichContentRenderer({
           tokens.push(
             <span
               key={`m-${match.index}`}
-              className="text-teal font-semibold hover:underline cursor-pointer"
+              className="inline-block font-semibold text-teal transition hover:underline"
             >
               {raw}
             </span>
           );
         }
 
-        lastIdx = regex.lastIndex;
+        lastIdx = match.index + raw.length;
       }
 
       if (lastIdx < text.length) {
@@ -159,119 +208,123 @@ export function RichContentRenderer({
       return tokens;
     };
 
-    for (let i = 0; i < rawLines.length; i++) {
-      const line = rawLines[i];
+    rawLines.forEach((line, idx) => {
+      const trimmed = line.trim();
 
-      // Code block start/end ```
-      if (line.trim().startsWith("```")) {
-        if (inCodeBlock) {
-          flushCodeBlock();
-        } else {
+      // Check code block ```
+      if (trimmed.startsWith("```")) {
+        if (!inCodeBlock) {
           flushList();
           inCodeBlock = true;
-          codeBlockLang = line.trim().slice(3).trim();
+          codeBlockLang = trimmed.slice(3).trim();
+          codeBlockLines = [];
+        } else {
+          flushCodeBlock();
         }
-        continue;
+        return;
       }
 
       if (inCodeBlock) {
         codeBlockLines.push(line);
-        continue;
+        return;
       }
 
-      // Horizontal Divider ---
-      if (line.trim() === "---" || line.trim() === "***") {
+      // Check horizontal rule ---
+      if (trimmed === "---" || trimmed === "***" || trimmed === "___") {
         flushList();
-        blocks.push(<hr key={`hr-${i}`} className="my-4 border-line/60" />);
-        continue;
+        blocks.push(<hr key={`hr-${idx}`} className="my-4 border-line" />);
+        return;
       }
 
-      // Headings
-      if (line.startsWith("# ")) {
-        flushList();
-        blocks.push(
-          <h1 key={`h1-${i}`} className="mt-4 mb-2 font-display text-xl sm:text-2xl font-bold tracking-tight text-ink">
-            {renderInline(line.slice(2))}
-          </h1>
-        );
-        continue;
-      }
-
-      if (line.startsWith("## ")) {
+      // Check Headings (# H1, ## H2, ### H3)
+      if (trimmed.startsWith("### ")) {
         flushList();
         blocks.push(
-          <h2 key={`h2-${i}`} className="mt-3.5 mb-1.5 font-display text-lg sm:text-xl font-bold tracking-tight text-ink">
-            {renderInline(line.slice(3))}
-          </h2>
-        );
-        continue;
-      }
-
-      if (line.startsWith("### ")) {
-        flushList();
-        blocks.push(
-          <h3 key={`h3-${i}`} className="mt-3 mb-1 font-display text-base sm:text-lg font-semibold tracking-tight text-ink">
-            {renderInline(line.slice(4))}
+          <h3 key={`h3-${idx}`} className="font-display text-base font-bold text-ink mt-3 mb-1.5">
+            {renderInline(trimmed.slice(4))}
           </h3>
         );
-        continue;
+        return;
+      }
+      if (trimmed.startsWith("## ")) {
+        flushList();
+        blocks.push(
+          <h2 key={`h2-${idx}`} className="font-display text-lg font-bold text-ink mt-4 mb-2">
+            {renderInline(trimmed.slice(3))}
+          </h2>
+        );
+        return;
+      }
+      if (trimmed.startsWith("# ")) {
+        flushList();
+        blocks.push(
+          <h1 key={`h1-${idx}`} className="font-display text-xl font-black text-ink mt-4 mb-2">
+            {renderInline(trimmed.slice(2))}
+          </h1>
+        );
+        return;
       }
 
-      // Blockquotes
-      if (line.startsWith("> ")) {
+      // Check Blockquote (> text)
+      if (trimmed.startsWith("> ")) {
         flushList();
         blocks.push(
           <blockquote
-            key={`bq-${i}`}
-            className="my-2 border-l-4 border-accent bg-accent/5 py-1.5 px-3.5 rounded-r-xl text-ink/90 italic"
+            key={`quote-${idx}`}
+            className="my-3 border-l-4 border-accent/80 bg-surface/50 pl-4 py-2 italic text-ink/90 rounded-r-xl"
           >
-            {renderInline(line.slice(2))}
+            {renderInline(trimmed.slice(2))}
           </blockquote>
         );
-        continue;
+        return;
       }
 
-      // Bullet List
-      if (line.startsWith("- ") || line.startsWith("* ")) {
+      // Check Bullet list (- item or * item)
+      if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
         if (!inList || listType !== "ul") {
           flushList();
           inList = true;
           listType = "ul";
         }
-        listItems.push(<li key={`li-${i}`}>{renderInline(line.slice(2))}</li>);
-        continue;
+        listItems.push(
+          <li key={`li-${idx}`} className="leading-relaxed">
+            {renderInline(trimmed.slice(2))}
+          </li>
+        );
+        return;
       }
 
-      // Numbered List
-      const numMatch = line.match(/^(\d+)\.\s+(.*)/);
+      // Check Numbered list (1. item)
+      const numMatch = trimmed.match(/^(\d+)\.\s+(.*)$/);
       if (numMatch) {
         if (!inList || listType !== "ol") {
           flushList();
           inList = true;
           listType = "ol";
         }
-        listItems.push(<li key={`li-${i}`}>{renderInline(numMatch[2])}</li>);
-        continue;
+        listItems.push(
+          <li key={`li-${idx}`} className="leading-relaxed">
+            {renderInline(numMatch[2])}
+          </li>
+        );
+        return;
       }
 
-      // End of list reached
-      if (inList) {
+      // If empty line, flush list and insert spacing
+      if (!trimmed) {
         flushList();
+        blocks.push(<div key={`sp-${idx}`} className="h-2" />);
+        return;
       }
 
-      // Empty line / paragraph gap
-      if (!line.trim()) {
-        blocks.push(<div key={`gap-${i}`} className="h-2" />);
-        continue;
-      }
-
-      // Standard Paragraph
+      // Regular paragraph
+      flushList();
       blocks.push(
-        <p key={`p-${i}`} className="my-1 text-ink/90 leading-relaxed break-words">
+        <p key={`p-${idx}`} className="leading-relaxed text-ink/95 my-1.5 break-words">
           {renderInline(line)}
         </p>
       );
-    }
+    });
 
     flushList();
     flushCodeBlock();
@@ -279,5 +332,5 @@ export function RichContentRenderer({
     return blocks;
   }, [content]);
 
-  return <div className={`rich-content-body space-y-1 ${className}`}>{renderedBlocks}</div>;
+  return <div className={`space-y-1 text-sm sm:text-base ${className}`}>{renderedBlocks}</div>;
 }

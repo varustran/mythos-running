@@ -226,8 +226,8 @@ export function RunnerQuiz({ locale }: { locale: Locale }) {
             </p>
             <p className="mt-3 text-xs sm:text-sm text-muted max-w-md mx-auto">
               {locale === "vi"
-                ? "Nền tảng sinh lý học và dinh dưỡng vững vàng là chìa khóa để chạy bền bỉ không chấn thương. Hãy khám phá thư viện giáo trình chuyên sâu tại Học viện Mythos."
-                : "A grounded understanding of exercise physiology and nutrition is key to injury-free running. Continue expanding your foundation at Mythos Academy."}
+                ? "Nền tảng sinh lý học và dinh dưỡng vững vàng là chìa khóa để chạy bền bỉ không chấn thương. Hãy khám phá thư viện giáo trình chuyên sâu tại Học viện Myso."
+                : "A grounded understanding of exercise physiology and nutrition is key to injury-free running. Continue expanding your foundation at Myso Academy."}
             </p>
 
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">

@@ -59,7 +59,7 @@ export default async function GearDetailPage({
         <div className="container-page relative py-10 sm:py-14">
           <Breadcrumbs
             items={[
-              { label: "Mythos", href: localePath(locale) },
+              { label: "Myso", href: localePath(locale) },
               { label: t("title"), href: localePath(locale, "/gear") },
               { label: review.title[locale] },
             ]}

@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Mythos Running — A Digital Ecosystem for Every Runner",
-    short_name: "Mythos",
-    description: "Global community, rich editorial publishing, performance science, and encrypted runner connections.",
+    name: "Myso — Nền Tảng Cộng Đồng & Xuất Bản Tri Thức Hiện Đại",
+    short_name: "Myso",
+    description: "Cộng đồng kết nối, viết bài đa phương tiện, thảo luận theo chủ đề và bách khoa mở.",
     start_url: "/vi",
     display: "standalone",
     background_color: "#080D16",

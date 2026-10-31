@@ -27,7 +27,7 @@ export default async function LabsPage({ params }: { params: Promise<{ locale: s
 
   return (
     <>
-      <PageHero eyebrow="Mythos Labs" title={t("title")} description={t("desc")} />
+      <PageHero eyebrow="Myso Labs" title={t("title")} description={t("desc")} />
       <div className="container-page py-12 sm:py-16">
         <div className="grid gap-4 md:grid-cols-2">
           {labProjects.map((project) => (

@@ -1,16 +1,15 @@
 export const siteConfig = {
-  name: "Mythos Running",
-  legalName: "Mythos Running Collective",
-  tagline: "International Running Community · Editorial Publishing · Science & Culture",
+  name: "Myso",
+  legalName: "Myso",
+  tagline: "Modern Community Platform · Editorial Publishing · Knowledge Discovery",
   description:
-    "Mythos Running is an international editorial publishing platform and community ecosystem for runners worldwide.",
+    "Myso is a modern community platform for writing, discussing, sharing knowledge, and connecting.",
   url: process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://mythos-running.vercel.app",
   locale: "vi",
   github: "https://github.com/varustran/mythos-running",
   social: [
     { label: "X (Twitter)", href: "https://x.com/" },
     { label: "GitHub", href: "https://github.com/varustran/mythos-running" },
-    { label: "Strava", href: "https://www.strava.com/" },
   ],
 };
 
@@ -29,7 +28,7 @@ export const footerGroups = [
     titleKey: "explore",
     links: [
       { label: "Bảng tin Mạng xã hội", href: "/" },
-      { label: "Bách khoa Mythos Wiki", href: "/wiki" },
+      { label: "Bách khoa Myso Wiki", href: "/wiki" },
       { label: "Chat mã hóa E2EE", href: "/chat" },
       { label: "Ghi chú nhanh bảo mật", href: "/notes" },
       { label: "Diễn đàn thảo luận", href: "/blog" },
