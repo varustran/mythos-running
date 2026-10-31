@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Flame, Sparkles, MessageSquare, StickyNote, User } from "lucide-react";
 import { localePath, type Locale } from "@/lib/i18n/settings";
+import { useAuth } from "@/components/providers/AuthProvider";
 
 interface MobileBottomBarProps {
   locale: Locale;
@@ -11,6 +12,13 @@ interface MobileBottomBarProps {
 
 export function MobileBottomBar({ locale }: MobileBottomBarProps) {
   const pathname = usePathname();
+  const { profile, status } = useAuth();
+
+  const profileHref = profile
+    ? status === "profile_incomplete"
+      ? "/onboarding"
+      : `/u/${profile.username}`
+    : "/login";
 
   const navs = [
     {
@@ -39,9 +47,10 @@ export function MobileBottomBar({ locale }: MobileBottomBarProps) {
     },
     {
       key: "profile",
-      label: "Tài khoản",
-      href: "/login",
+      label: profile ? "Hồ sơ" : "Tài khoản",
+      href: profileHref,
       icon: User,
+      avatar: profile?.avatar_url,
     },
   ];
 
@@ -67,7 +76,13 @@ export function MobileBottomBar({ locale }: MobileBottomBarProps) {
               }`}
             >
               <div className="relative">
-                <Icon className={`h-5 w-5 ${isActive ? "text-accent" : "text-muted"}`} />
+                {item.avatar ? (
+                  <div className={`h-5 w-5 rounded-full overflow-hidden border ${isActive ? "border-accent" : "border-line"}`}>
+                    <img src={item.avatar} alt="Avatar" className="h-full w-full object-cover" />
+                  </div>
+                ) : (
+                  <Icon className={`h-5 w-5 ${isActive ? "text-accent" : "text-muted"}`} />
+                )}
                 {isActive && (
                   <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-accent" />
                 )}

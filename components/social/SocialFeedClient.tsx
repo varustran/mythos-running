@@ -333,7 +333,7 @@ export function SocialFeedClient({
     // Active author identity
     const authorName = profile?.full_name || anonIdentity?.displayName || "Thành viên Myso";
     const authorHandle = profile?.username || anonIdentity?.handle || "user";
-    const authorAvatar = profile?.avatar_url || (authStatus === "authenticated" ? null : "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80");
+    const authorAvatar = profile?.avatar_url || (authStatus !== "guest" ? null : "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80");
 
     const postStatus = isDraft ? "draft" : isScheduling && scheduledDateTime ? "scheduled" : "published";
 
@@ -1117,7 +1117,7 @@ export function SocialFeedClient({
                       {/* Author Header */}
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-3">
-                          <Link href={localePath(locale, `/profile/${post.author_handle}`)} className="shrink-0">
+                          <Link href={localePath(locale, `/u/${post.author_handle}`)} className="shrink-0">
                             <div className="h-10 w-10 rounded-full border border-line bg-canvas overflow-hidden flex items-center justify-center">
                               {post.author_avatar ? (
                                 <img src={post.author_avatar} alt={post.author_name} className="h-full w-full object-cover" />
@@ -1130,7 +1130,7 @@ export function SocialFeedClient({
                           <div>
                             <div className="flex items-center gap-2">
                               <Link
-                                href={localePath(locale, `/profile/${post.author_handle}`)}
+                                href={localePath(locale, `/u/${post.author_handle}`)}
                                 className="font-display text-xs sm:text-sm font-bold text-ink hover:text-accent transition truncate"
                               >
                                 {post.author_name}
@@ -1147,7 +1147,7 @@ export function SocialFeedClient({
                               )}
                             </div>
                             <div className="flex items-center gap-2 text-[0.7rem] font-mono text-subtle">
-                              <Link href={localePath(locale, `/profile/${post.author_handle}`)} className="hover:underline">
+                              <Link href={localePath(locale, `/u/${post.author_handle}`)} className="hover:underline">
                                 @{post.author_handle}
                               </Link>
                               <span>·</span>
@@ -1344,10 +1344,13 @@ export function SocialFeedClient({
                                     {/* Root comment card */}
                                     <div className="p-3 rounded-xl border border-line/60 bg-canvas space-y-1.5 text-xs">
                                       <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                          <span className="font-bold text-ink">{rootC.author_name}</span>
+                                        <Link
+                                          href={localePath(locale, `/u/${rootC.author_handle}`)}
+                                          className="flex items-center gap-2 hover:underline"
+                                        >
+                                          <span className="font-bold text-ink hover:text-accent transition">{rootC.author_name}</span>
                                           <span className="font-mono text-[0.65rem] text-muted">@{rootC.author_handle}</span>
-                                        </div>
+                                        </Link>
                                         <button
                                           type="button"
                                           onClick={() => handleTranslateComment(rootC.id, rootC.content)}
@@ -1383,8 +1386,13 @@ export function SocialFeedClient({
                                         {replies.map((rep) => (
                                           <div key={rep.id} className="p-2.5 rounded-xl border border-line/50 bg-canvas/80 space-y-1 text-xs">
                                             <div className="flex items-center justify-between">
-                                              <span className="font-bold text-ink">{rep.author_name}</span>
-                                              <span className="font-mono text-[0.65rem] text-muted">@{rep.author_handle}</span>
+                                              <Link
+                                                href={localePath(locale, `/u/${rep.author_handle}`)}
+                                                className="flex items-center gap-1.5 hover:underline"
+                                              >
+                                                <span className="font-bold text-ink hover:text-accent transition">{rep.author_name}</span>
+                                                <span className="font-mono text-[0.65rem] text-muted">@{rep.author_handle}</span>
+                                              </Link>
                                             </div>
                                             <p className="text-ink leading-relaxed">{rep.content}</p>
                                           </div>

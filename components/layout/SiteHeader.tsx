@@ -92,14 +92,14 @@ export function SiteHeader({ locale, role }: { locale: Locale; role?: string | n
             </div>
 
             {/* Dynamic User Profile or Login */}
-            {status === "authenticated" && profile ? (
-              <div className="relative hidden md:block" ref={userMenuRef}>
+            {profile ? (
+              <div className="relative" ref={userMenuRef}>
                 <button
                   type="button"
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
                   className="inline-flex h-9 items-center gap-2 rounded-xl border border-line bg-surface px-2.5 text-xs font-semibold text-ink transition hover:border-accent/60"
                 >
-                  <div className="h-6 w-6 rounded-lg overflow-hidden border border-line bg-canvas flex items-center justify-center">
+                  <div className="h-6 w-6 rounded-lg overflow-hidden border border-line bg-canvas flex items-center justify-center flex-shrink-0">
                     {profile.avatar_url ? (
                       <img src={profile.avatar_url} alt={profile.full_name} className="h-full w-full object-cover" />
                     ) : (
@@ -108,21 +108,30 @@ export function SiteHeader({ locale, role }: { locale: Locale; role?: string | n
                       </span>
                     )}
                   </div>
-                  <span className="max-w-[100px] truncate">{profile.full_name}</span>
+                  <span className="hidden sm:inline max-w-[100px] truncate">{profile.full_name}</span>
                   <ChevronDown className="h-3 w-3 text-muted" />
                 </button>
 
                 {/* Dropdown Menu */}
                 {userMenuOpen && (
-                  <div className="absolute right-0 top-11 z-50 w-52 rounded-2xl border border-line bg-surface p-2 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-top-2">
+                  <div className="absolute right-0 top-11 z-50 w-56 rounded-2xl border border-line bg-surface p-2 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-top-2">
                     <div className="border-b border-line px-3 py-2">
                       <p className="text-xs font-bold text-ink truncate">{profile.full_name}</p>
                       <p className="text-[0.7rem] font-mono text-muted">@{profile.username}</p>
+                      {status === "profile_incomplete" && (
+                        <Link
+                          href={localePath(locale, "/onboarding")}
+                          onClick={() => setUserMenuOpen(false)}
+                          className="mt-1.5 inline-block text-[0.68rem] font-bold text-accent underline"
+                        >
+                          Chưa hoàn tất hồ sơ · Tiếp tục
+                        </Link>
+                      )}
                     </div>
 
                     <div className="py-1">
                       <Link
-                        href={localePath(locale, `/profile/${profile.username}`)}
+                        href={localePath(locale, `/u/${profile.username}`)}
                         onClick={() => setUserMenuOpen(false)}
                         className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-ink transition hover:bg-canvas"
                       >
@@ -131,12 +140,12 @@ export function SiteHeader({ locale, role }: { locale: Locale; role?: string | n
                       </Link>
 
                       <Link
-                        href={localePath(locale, `/profile/${profile.username}`)}
+                        href={localePath(locale, "/settings")}
                         onClick={() => setUserMenuOpen(false)}
                         className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-ink transition hover:bg-canvas"
                       >
                         <Clock className="h-3.5 w-3.5 text-teal" />
-                        <span>Bản nháp & Lên lịch</span>
+                        <span>Cài đặt & Quyền riêng tư</span>
                       </Link>
 
                       {isAdmin && (
@@ -170,7 +179,7 @@ export function SiteHeader({ locale, role }: { locale: Locale; role?: string | n
             ) : (
               <Link
                 href={localePath(locale, "/login")}
-                className="hidden h-9 items-center gap-1.5 rounded-xl border border-line bg-surface px-3.5 text-xs font-semibold text-ink transition hover:border-accent/60 hover:text-accent md:inline-flex"
+                className="hidden h-9 items-center gap-1.5 rounded-xl border border-line bg-surface px-3.5 text-xs font-semibold text-ink transition hover:border-accent/60 hover:text-accent sm:inline-flex"
               >
                 <LogIn className="h-3.5 w-3.5 text-accent" />
                 <span>Đăng Nhập</span>

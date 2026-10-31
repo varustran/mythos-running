@@ -34,36 +34,98 @@ export async function createClient() {
   );
 }
 
+export type UserRole = "admin" | "moderator" | "editor" | "contributor" | "user";
+
 export type SessionProfile = {
   id: string;
+  userId: string;
   email: string | null;
+  username: string | null;
   fullName: string | null;
-  role: "admin" | "editor" | "reader";
+  avatarUrl: string | null;
+  role: UserRole;
+  onboardingCompleted: boolean;
+  onboardingStep: number;
 };
 
-export const getCurrentProfile = cache(async (): Promise<SessionProfile | null> => {
+export type AccountStatus =
+  | "guest"
+  | "authenticated_no_profile"
+  | "profile_incomplete"
+  | "profile_complete";
+
+export interface AccountSessionData {
+  user: {
+    id: string;
+    email?: string | null;
+  } | null;
+  profile: SessionProfile | null;
+  status: AccountStatus;
+}
+
+export const getAccountSession = cache(async (): Promise<AccountSessionData> => {
   const supabase = await createClient();
-  if (!supabase) return null;
+  if (!supabase) {
+    return { user: null, profile: null, status: "guest" };
+  }
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return null;
 
+  if (!user) {
+    return { user: null, profile: null, status: "guest" };
+  }
+
+  // Query database profiles table by user_id, id, or email
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, email, full_name, role")
-    .eq("id", user.id)
+    .select("id, user_id, email, username, full_name, avatar_url, role, onboarding_completed, onboarding_step")
+    .or(`user_id.eq.${user.id},id.eq.${user.id},email.eq.${user.email}`)
     .maybeSingle();
 
+  if (!profile) {
+    return {
+      user: { id: user.id, email: user.email },
+      profile: null,
+      status: "authenticated_no_profile",
+    };
+  }
+
+  const isRootAdmin = user.email === "chuitv1907@gmail.com";
+  const userRole: UserRole = isRootAdmin
+    ? "admin"
+    : (profile.role as UserRole) || "user";
+
+  const sessionProf: SessionProfile = {
+    id: profile.id,
+    userId: profile.user_id || user.id,
+    email: profile.email || user.email || null,
+    username: profile.username || null,
+    fullName: profile.full_name || user.user_metadata?.full_name || "Thành viên Myso",
+    avatarUrl: profile.avatar_url || user.user_metadata?.avatar_url || null,
+    role: userRole,
+    onboardingCompleted: Boolean(profile.onboarding_completed || isRootAdmin),
+    onboardingStep: profile.onboarding_step || 1,
+  };
+
+  const status: AccountStatus = sessionProf.onboardingCompleted
+    ? "profile_complete"
+    : "profile_incomplete";
+
   return {
-    id: user.id,
-    email: user.email ?? null,
-    fullName: profile?.full_name ?? user.user_metadata?.full_name ?? null,
-    role: (profile?.role as SessionProfile["role"]) || "reader",
+    user: { id: user.id, email: user.email },
+    profile: sessionProf,
+    status,
   };
 });
 
+export const getCurrentProfile = cache(async (): Promise<SessionProfile | null> => {
+  const session = await getAccountSession();
+  return session.profile;
+});
+
 export async function isAdmin() {
-  const profile = await getCurrentProfile();
-  return profile?.role === "admin" || profile?.role === "editor";
+  const session = await getAccountSession();
+  return session.profile?.role === "admin";
 }

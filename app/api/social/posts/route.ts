@@ -33,7 +33,7 @@ export async function GET(req: Request) {
       const { data: prof } = await supabase
         .from("profiles")
         .select("username")
-        .or(`id.eq.${user.id},user_id.eq.${user.id}`)
+        .or(`id.eq.${user.id},user_id.eq.${user.id},email.eq.${user.email}`)
         .maybeSingle();
       currentUserHandle = prof?.username || null;
     }

@@ -5,7 +5,7 @@
  */
 export async function uploadMediaFile(
   file: File,
-  folder: "posts" | "avatars" | "chat" | "general" = "posts"
+  folder: "posts" | "avatars" | "covers" | "chat" | "general" = "posts"
 ): Promise<{ url: string; name: string; type: string; size: number }> {
   const formData = new FormData();
   formData.append("file", file);

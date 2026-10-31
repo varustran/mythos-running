@@ -1,12 +1,6 @@
 import type { MetadataRoute } from "next";
 import { siteConfig } from "@/lib/site";
 import { locales } from "@/lib/i18n/settings";
-import { articles } from "@/data/articles";
-import { events } from "@/data/events";
-import { routes } from "@/data/routes";
-import { gearReviews } from "@/data/gear";
-import { labProjects } from "@/data/labs";
-import { tools } from "@/lib/tools/catalog";
 
 const base = siteConfig.url;
 
@@ -25,15 +19,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const staticPaths = [
     { path: "", priority: 1, changeFrequency: "daily" as const },
     { path: "/wiki", priority: 0.95, changeFrequency: "daily" as const },
-    { path: "/blog", priority: 0.9, changeFrequency: "daily" as const },
     { path: "/chat", priority: 0.85, changeFrequency: "daily" as const },
     { path: "/notes", priority: 0.8, changeFrequency: "weekly" as const },
-    { path: "/arcade", priority: 0.8, changeFrequency: "weekly" as const },
-    { path: "/monetization", priority: 0.75, changeFrequency: "weekly" as const },
     { path: "/legal/standards", priority: 0.7, changeFrequency: "monthly" as const },
-    { path: "/legal/faq", priority: 0.7, changeFrequency: "monthly" as const },
-    { path: "/tools", priority: 0.7, changeFrequency: "weekly" as const },
-    { path: "/community", priority: 0.6, changeFrequency: "weekly" as const },
     { path: "/about", priority: 0.5, changeFrequency: "monthly" as const },
     { path: "/contact", priority: 0.4, changeFrequency: "monthly" as const },
     { path: "/privacy", priority: 0.3, changeFrequency: "yearly" as const },
@@ -42,13 +30,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/disclaimer", priority: 0.3, changeFrequency: "yearly" as const },
   ];
 
-  return [
-    ...staticPaths.map((item) => entry(item.path, item.priority, item.changeFrequency)),
-    ...articles.map((article) => entry(`/academy/${article.slug}`, 0.8)),
-    ...tools.map((tool) => entry(`/tools/${tool.slug}`, 0.7)),
-    ...routes.map((route) => entry(`/routes/${route.slug}`, 0.6, "monthly")),
-    ...gearReviews.map((review) => entry(`/gear/${review.slug}`, 0.6)),
-    ...labProjects.map((project) => entry(`/labs/${project.slug}`, 0.5)),
-    ...events.filter((event) => !event.sample).map((event) => entry(`/events/${event.slug}`, 0.6, "weekly")),
-  ];
+  return staticPaths.map((item) => entry(item.path, item.priority, item.changeFrequency));
 }

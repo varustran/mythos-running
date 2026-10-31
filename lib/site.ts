@@ -18,8 +18,6 @@ export const navItems = [
   { key: "wiki", href: "/wiki" },
   { key: "chat", href: "/chat" },
   { key: "notes", href: "/notes" },
-  { key: "blog", href: "/blog" },
-  { key: "arcade", href: "/arcade" },
   { key: "standards", href: "/legal/standards" },
 ] as const;
 
@@ -31,17 +29,15 @@ export const footerGroups = [
       { label: "Bách khoa Myso Wiki", href: "/wiki" },
       { label: "Chat mã hóa E2EE", href: "/chat" },
       { label: "Ghi chú nhanh bảo mật", href: "/notes" },
-      { label: "Diễn đàn thảo luận", href: "/blog" },
-      { label: "Trò chơi Arcade", href: "/arcade" },
     ],
   },
   {
     titleKey: "creator",
     links: [
       { label: "Tạo tài khoản & Profile", href: "/login" },
-      { label: "Đăng bài viết mới", href: "/blog/create" },
-      { label: "Tài liệu cơ chế kiếm tiền", href: "/monetization" },
-      { label: "Câu hỏi thường gặp (FAQ)", href: "/legal/faq" },
+      { label: "Thiết lập hồ sơ Onboarding", href: "/onboarding" },
+      { label: "Cài đặt tài khoản", href: "/settings" },
+      { label: "Đóng góp bài viết Wiki", href: "/wiki/propose" },
     ],
   },
   {

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ShieldAlert, CheckCircle2, User, Flame, Shield } from "lucide-react";
+import { ArrowLeft, ShieldAlert, CheckCircle2, User, Flame, Shield, ArrowRight } from "lucide-react";
 import { isLocale, localePath, type Locale } from "@/lib/i18n/settings";
 import { getT } from "@/lib/i18n/server";
 import { buildMetadata } from "@/lib/seo";
@@ -63,17 +63,44 @@ export default async function LoginPage({ params }: { params: Promise<{ locale: 
                 {profile.fullName || "Thành viên Myso"}
               </h1>
               <p className="font-mono text-xs text-muted mt-1">{profile.email}</p>
-              <span className="inline-block mt-2 font-mono text-[0.68rem] uppercase tracking-wider text-accent border border-accent/40 bg-accent/10 px-2.5 py-0.5 rounded-full font-bold">
-                Vai trò: {profile.role}
-              </span>
+              <div className="flex items-center justify-center gap-2 mt-2">
+                <span className="font-mono text-[0.68rem] uppercase tracking-wider text-accent border border-accent/40 bg-accent/10 px-2.5 py-0.5 rounded-full font-bold">
+                  Vai trò: {profile.role}
+                </span>
+                {profile.username && (
+                  <span className="font-mono text-[0.68rem] text-muted border border-line bg-canvas px-2.5 py-0.5 rounded-full">
+                    @{profile.username}
+                  </span>
+                )}
+              </div>
             </div>
 
             <div className="pt-2 flex flex-col gap-2.5">
+              {!profile.onboardingCompleted ? (
+                <Link
+                  href={localePath(locale, "/onboarding")}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3 text-xs sm:text-sm font-bold text-white dark:text-[#04101F] transition hover:opacity-90 shadow-md shadow-accent/20 active:scale-95"
+                >
+                  <span>Chưa hoàn tất hồ sơ · Tiếp tục Onboarding</span>
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              ) : null}
+
+              {profile.username && (
+                <Link
+                  href={localePath(locale, `/u/${profile.username}`)}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-teal px-5 py-3 text-xs sm:text-sm font-bold text-white transition hover:opacity-95 shadow-md shadow-teal/20 active:scale-95"
+                >
+                  <User className="h-4 w-4" />
+                  Xem Trang Cá Nhân (@{profile.username})
+                </Link>
+              )}
+
               <Link
                 href={localePath(locale, "/")}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3 text-xs sm:text-sm font-bold text-white dark:text-[#04101F] transition hover:opacity-95 shadow-md shadow-accent/20 active:scale-95"
+                className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-canvas hover:border-accent px-5 py-2.5 text-xs font-semibold text-ink transition active:scale-95"
               >
-                <Flame className="h-4 w-4" />
+                <Flame className="h-4 w-4 text-accent" />
                 Vào Bảng Tin Ngay
               </Link>
 

@@ -29,7 +29,7 @@ export async function GET(
     // Query profile
     const { data: profile, error } = await supabase
       .from("profiles")
-      .select("id, user_id, username, full_name, avatar_url, cover_url, bio, interests, verified, streak_days, followers_count, following_count, created_at, role")
+      .select("id, user_id, email, username, full_name, avatar_url, cover_url, bio, interests, skills, topics, verified, streak_days, created_at, role, onboarding_completed")
       .ilike("username", cleanUsername)
       .maybeSingle();
 
@@ -44,25 +44,94 @@ export async function GET(
             cover_url: null,
             bio: "Tài khoản chính thức của Đội ngũ Phát triển Nền tảng Myso.",
             interests: ["Công nghệ", "Cộng đồng", "Wiki", "Bảo mật"],
+            skills: ["Fullstack", "Product Design", "Security"],
+            topics: ["Myso Core", "Open Source"],
             verified: true,
             streak_days: 12,
             followers_count: 320,
             following_count: 5,
+            posts_count: 12,
+            wiki_count: 4,
+            communities_count: 4,
             created_at: "2026-01-01T00:00:00Z",
             role: "admin",
             is_self: user?.email === "chuitv1907@gmail.com",
+            is_following: false,
           },
         });
       }
       return NextResponse.json({ error: "Không tìm thấy hồ sơ người dùng" }, { status: 404 });
     }
 
-    const isSelf = user ? (profile.user_id === user.id || profile.id === user.id) : false;
+    const isSelf = user ? (profile.user_id === user.id || profile.id === user.id || user.email === profile.email) : false;
+
+    // Real followers count
+    const { count: realFollowersCount } = await supabase
+      .from("follows")
+      .select("*", { count: "exact", head: true })
+      .ilike("following_handle", cleanUsername);
+
+    // Real following count
+    const { count: realFollowingCount } = await supabase
+      .from("follows")
+      .select("*", { count: "exact", head: true })
+      .ilike("follower_handle", cleanUsername);
+
+    // Real posts count (only public unless self)
+    let postsQuery = supabase
+      .from("posts")
+      .select("*", { count: "exact", head: true })
+      .ilike("author_handle", cleanUsername);
+    if (!isSelf) {
+      postsQuery = postsQuery.eq("visibility", "public").eq("status", "published");
+    }
+    const { count: realPostsCount } = await postsQuery;
+
+    // Real Wiki contributions count
+    let wikiCount = 0;
+    try {
+      const { count } = await supabase
+        .from("wiki_revisions")
+        .select("*", { count: "exact", head: true })
+        .ilike("author_handle", cleanUsername);
+      wikiCount = count || 0;
+    } catch {
+      wikiCount = 0;
+    }
+
+    // Check if the current logged-in user is following this profile
+    let isFollowing = false;
+    if (user && !isSelf) {
+      const { data: myProfile } = await supabase
+        .from("profiles")
+        .select("username")
+        .or(`user_id.eq.${user.id},id.eq.${user.id},email.eq.${user.email}`)
+        .maybeSingle();
+
+      const myHandle = (myProfile?.username || user.email?.split("@")[0] || "").toLowerCase();
+      if (myHandle) {
+        const { data: followRecord } = await supabase
+          .from("follows")
+          .select("id")
+          .eq("follower_handle", myHandle)
+          .ilike("following_handle", cleanUsername)
+          .maybeSingle();
+        isFollowing = Boolean(followRecord);
+      }
+    }
+
+    const communitiesCount = Array.isArray(profile.interests) ? profile.interests.length : 0;
 
     return NextResponse.json({
       profile: {
         ...profile,
+        followers_count: realFollowersCount ?? 0,
+        following_count: realFollowingCount ?? 0,
+        posts_count: realPostsCount ?? 0,
+        wiki_count: wikiCount,
+        communities_count: communitiesCount,
         is_self: isSelf,
+        is_following: isFollowing,
       },
     });
   } catch (err: any) {
@@ -99,19 +168,21 @@ export async function PUT(
     }
 
     const body = await req.json();
-    const { full_name, bio, avatar_url, cover_url, interests } = body;
+    const { full_name, bio, avatar_url, cover_url, interests, skills, topics } = body;
 
     const { data: updated, error } = await supabase
       .from("profiles")
       .update({
         full_name: full_name?.trim(),
-        bio: bio?.trim(),
-        avatar_url: avatar_url || null,
-        cover_url: cover_url || null,
-        interests: Array.isArray(interests) ? interests : [],
+        bio: bio !== undefined ? (bio ? bio.trim() : null) : undefined,
+        avatar_url: avatar_url !== undefined ? avatar_url : undefined,
+        cover_url: cover_url !== undefined ? cover_url : undefined,
+        interests: Array.isArray(interests) ? interests : undefined,
+        skills: Array.isArray(skills) ? skills : undefined,
+        topics: Array.isArray(topics) ? topics : undefined,
         updated_at: new Date().toISOString(),
       })
-      .or(`id.eq.${user.id},user_id.eq.${user.id}`)
+      .or(`id.eq.${user.id},user_id.eq.${user.id},email.eq.${user.email}`)
       .select()
       .single();
 

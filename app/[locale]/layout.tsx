@@ -7,6 +7,7 @@ import { buildMetadata, JsonLd, organizationSchema, websiteSchema } from "@/lib/
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { I18nProvider } from "@/components/providers/I18nProvider";
 import { AuthProvider } from "@/components/providers/AuthProvider";
+import { getAccountSession } from "@/lib/supabase/server";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { MobileBottomBar } from "@/components/layout/MobileBottomBar";
@@ -84,13 +85,14 @@ export default async function LocaleLayout({
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
   const t = getT(locale, "common");
+  const sessionData = await getAccountSession();
 
   return (
     <html lang={htmlLang[locale]} suppressHydrationWarning>
       <body className="pb-16 lg:pb-0">
         <ThemeProvider>
           <I18nProvider locale={locale}>
-            <AuthProvider>
+            <AuthProvider initialSession={sessionData}>
               <a
                 href="#main"
                 className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-full focus:bg-accent focus:px-4 focus:py-2 focus:text-sm focus:text-white"

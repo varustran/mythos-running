@@ -1,47 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { defaultLocale, isLocale } from "@/lib/i18n/settings";
 import { updateSession } from "@/lib/supabase/middleware";
-import { articles } from "@/data/articles";
-import { events } from "@/data/events";
-import { routes } from "@/data/routes";
-import { gearReviews } from "@/data/gear";
-import { labProjects } from "@/data/labs";
-import { tools } from "@/lib/tools/catalog";
 
 const SKIP_PREFIXES = ["/_next", "/api", "/auth", "/fonts", "/brand", "/images"];
-
-const slugs = {
-  academy: new Set(articles.map((article) => article.slug)),
-  events: new Set(events.map((event) => event.slug)),
-  routes: new Set(routes.map((route) => route.slug)),
-  gear: new Set(gearReviews.map((review) => review.slug)),
-  labs: new Set(labProjects.map((project) => project.slug)),
-  tools: new Set(tools.map((tool) => tool.slug)),
-};
-
-const categories = new Set(["beginner", "training", "physiology", "nutrition", "recovery", "gear", "racing"]);
-
-function isMissingContent(segments: string[]) {
-  if (segments.length < 3) return false;
-  const section = segments[1];
-  const slug = segments[2];
-
-  if (section === "academy") {
-    if (slug === "category") {
-      if (segments.length === 3) return false;
-      return segments.length > 4 || !categories.has(segments[3]);
-    }
-    if (segments.length > 3) return true;
-    return !slugs.academy.has(slug);
-  }
-
-  if (section in slugs) {
-    if (segments.length > 3) return true;
-    return !slugs[section as keyof typeof slugs].has(slug);
-  }
-
-  return false;
-}
 
 function detectLocale(request: NextRequest) {
   const cookie = request.cookies.get("NEXT_LOCALE")?.value;
@@ -80,11 +41,6 @@ export async function middleware(request: NextRequest) {
   const maybeLocale = segments[0];
 
   if (maybeLocale && isLocale(maybeLocale)) {
-    if (isMissingContent(segments)) {
-      const url = request.nextUrl.clone();
-      url.pathname = `/${maybeLocale}/not-found-page`;
-      return NextResponse.rewrite(url, { status: 404 });
-    }
     return updateSession(request);
   }
 

@@ -6,8 +6,9 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const postId = searchParams.get("post_id");
+    const authorHandle = searchParams.get("author_handle");
 
-    if (!postId) {
+    if (!postId && !authorHandle) {
       return NextResponse.json({ comments: [] });
     }
 
@@ -23,11 +24,16 @@ export async function GET(req: Request) {
       }
     );
 
-    const { data: comments, error } = await supabase
-      .from("social_comments")
-      .select("*")
-      .eq("post_id", postId)
-      .order("created_at", { ascending: true });
+    let query = supabase.from("social_comments").select("*");
+
+    if (postId) {
+      query = query.eq("post_id", postId).order("created_at", { ascending: true });
+    } else if (authorHandle) {
+      const cleanHandle = authorHandle.replace(/^@/, "").trim().toLowerCase();
+      query = query.ilike("author_handle", cleanHandle).order("created_at", { ascending: false }).limit(50);
+    }
+
+    const { data: comments, error } = await query;
 
     if (error) {
       return NextResponse.json({ comments: [] });

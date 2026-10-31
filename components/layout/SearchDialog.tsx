@@ -2,22 +2,17 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Search, X, CornerDownLeft } from "lucide-react";
-import { useTranslation } from "react-i18next";
-import { articles } from "@/data/articles";
-import { events } from "@/data/events";
-import { routes } from "@/data/routes";
-import { gearReviews } from "@/data/gear";
-import { labProjects } from "@/data/labs";
-import { tools } from "@/lib/tools/catalog";
+import { Search, X, CornerDownLeft, Sparkles, Flame, MessageSquare, StickyNote, ShieldCheck, User, Settings } from "lucide-react";
 import type { Locale } from "@/lib/i18n/settings";
+import { localePath } from "@/lib/i18n/settings";
 import { cn } from "@/lib/utils";
 
 type Item = {
   title: string;
   description: string;
   href: string;
-  group: "academy" | "tools" | "events" | "routes" | "gear" | "labs";
+  icon: any;
+  category: string;
 };
 
 function normalize(value: string) {
@@ -37,142 +32,156 @@ export function SearchDialog({
   open: boolean;
   onClose: () => void;
 }) {
-  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const index = useMemo<Item[]>(() => {
     return [
-      ...articles.map((article) => ({
-        title: article.title[locale],
-        description: article.excerpt[locale],
-        href: `/${locale}/academy/${article.slug}`,
-        group: "academy" as const,
-      })),
-      ...tools.map((tool) => ({
-        title: t(`tools:items.${tool.slug}.name`),
-        description: t(`tools:items.${tool.slug}.desc`),
-        href: `/${locale}/tools/${tool.slug}`,
-        group: "tools" as const,
-      })),
-      ...events.map((event) => ({
-        title: event.title[locale],
-        description: event.location[locale],
-        href: `/${locale}/events/${event.slug}`,
-        group: "events" as const,
-      })),
-      ...routes.map((route) => ({
-        title: route.name[locale],
-        description: route.description[locale],
-        href: `/${locale}/routes/${route.slug}`,
-        group: "routes" as const,
-      })),
-      ...gearReviews.map((review) => ({
-        title: review.title[locale],
-        description: review.excerpt[locale],
-        href: `/${locale}/gear/${review.slug}`,
-        group: "gear" as const,
-      })),
-      ...labProjects.map((project) => ({
-        title: project.title[locale],
-        description: project.summary[locale],
-        href: `/${locale}/labs`,
-        group: "labs" as const,
-      })),
+      {
+        title: "Bảng tin Mạng xã hội",
+        description: "Khám phá bài viết, tương tác, like, bình luận và thảo luận đa chiều",
+        href: "/",
+        icon: Flame,
+        category: "Khám phá",
+      },
+      {
+        title: "Bách khoa Myso Wiki",
+        description: "Hệ thống tri thức bách khoa mở chuẩn Wikipedia",
+        href: "/wiki",
+        icon: Sparkles,
+        category: "Wiki",
+      },
+      {
+        title: "Phòng Chat mã hóa E2EE",
+        description: "Trò chuyện nhóm và tin nhắn trực tiếp bảo mật",
+        href: "/chat",
+        icon: MessageSquare,
+        category: "Giao tiếp",
+      },
+      {
+        title: "Ghi chú nhanh bảo mật",
+        description: "Soạn thảo và lưu trữ ghi chú mã hóa",
+        href: "/notes",
+        icon: StickyNote,
+        category: "Công cụ",
+      },
+      {
+        title: "Thiết lập Hồ sơ Onboarding",
+        description: "Cập nhật display name, @username, avatar, bio, và chủ đề yêu thích",
+        href: "/onboarding",
+        icon: User,
+        category: "Tài khoản",
+      },
+      {
+        title: "Cài đặt Tài khoản & Quyền riêng tư",
+        description: "Tùy chỉnh thông tin cá nhân và cấu hình bảo mật",
+        href: "/settings",
+        icon: Settings,
+        category: "Tài khoản",
+      },
+      {
+        title: "Tiêu chuẩn Cộng đồng & Pháp lý",
+        description: "Quy chuẩn nội dung, chống spam và bảo vệ người dùng",
+        href: "/legal/standards",
+        icon: ShieldCheck,
+        category: "Chính sách",
+      },
     ];
-  }, [locale, t]);
+  }, []);
 
   const results = useMemo(() => {
     const q = normalize(query.trim());
-    if (!q) return index.slice(0, 7);
-    return index
-      .filter((item) => normalize(`${item.title} ${item.description}`).includes(q))
-      .slice(0, 9);
-  }, [index, query]);
+    if (!q) return index;
+    return index.filter((item) =>
+      normalize(`${item.title} ${item.description} ${item.category}`).includes(q)
+    );
+  }, [query, index]);
 
   useEffect(() => {
-    if (!open) return;
-    setQuery("");
-    const timer = window.setTimeout(() => inputRef.current?.focus(), 40);
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.clearTimeout(timer);
-      document.body.style.overflow = "";
-    };
-  }, [open]);
-
-  useEffect(() => {
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+    if (open) {
+      setTimeout(() => inputRef.current?.focus(), 50);
+    } else {
+      setQuery("");
     }
-    if (open) window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
-  const groupLabels: Record<Item["group"], string> = {
-    academy: t("nav:academy"),
-    tools: t("nav:tools"),
-    events: t("nav:events"),
-    routes: t("nav:routes"),
-    gear: t("nav:gear"),
-    labs: t("nav:labs"),
-  };
-
   return (
-    <div className="fixed inset-0 z-[80] flex items-start justify-center bg-[#03070d]/70 px-4 pt-[10vh] backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={t("common:search")}>
-      <button className="absolute inset-0 cursor-default" aria-label={t("common:close")} onClick={onClose} tabIndex={-1} />
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-line bg-surface shadow-lift">
-        <div className="flex items-center gap-3 border-b border-line px-4">
-          <Search className="h-4 w-4 text-subtle" aria-hidden="true" />
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/60 p-4 pt-16 sm:pt-24 backdrop-blur-md animate-in fade-in duration-150"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-xl overflow-hidden rounded-3xl border border-line bg-surface p-2 shadow-2xl backdrop-blur-xl animate-in zoom-in-95 duration-150"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Search Input Bar */}
+        <div className="flex items-center gap-3 border-b border-line px-4 py-3">
+          <Search className="h-5 w-5 text-accent" />
           <input
             ref={inputRef}
+            type="text"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={t("common:searchPlaceholder")}
-            className="h-14 flex-1 bg-transparent text-[0.95rem] text-ink outline-none placeholder:text-subtle"
-            aria-label={t("common:search")}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Tìm kiếm trang, wiki, tính năng trên Myso..."
+            className="flex-1 bg-transparent text-sm text-ink placeholder:text-muted outline-none"
           />
-          <button
-            onClick={onClose}
-            className="rounded-md p-1.5 text-subtle transition hover:bg-elevated hover:text-ink"
-            aria-label={t("common:close")}
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="max-h-[55vh] overflow-y-auto p-2">
-          {results.length === 0 ? (
-            <p className="px-3 py-8 text-center text-sm text-muted">{t("common:noResults")}</p>
-          ) : (
-            <ul className="space-y-0.5">
-              {results.map((item) => (
-                <li key={`${item.group}-${item.href}-${item.title}`}>
-                  <Link
-                    href={item.href}
-                    onClick={onClose}
-                    className="group flex items-start gap-3 rounded-xl px-3 py-3 transition hover:bg-elevated"
-                  >
-                    <span className="mt-0.5 rounded-md border border-line px-1.5 py-0.5 font-mono text-[0.58rem] uppercase tracking-[0.12em] text-subtle">
-                      {groupLabels[item.group]}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-ink group-hover:text-accent">
-                        {item.title}
-                      </span>
-                      <span className="mt-0.5 block truncate text-xs text-muted">{item.description}</span>
-                    </span>
-                    <CornerDownLeft className="mt-1 h-3.5 w-3.5 shrink-0 text-subtle opacity-0 transition group-hover:opacity-100" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              className="text-muted hover:text-ink text-xs"
+            >
+              <X className="h-4 w-4" />
+            </button>
           )}
+          <kbd className="hidden sm:inline-block rounded-lg border border-line bg-canvas px-2 py-0.5 text-[0.65rem] font-mono text-muted">
+            ESC
+          </kbd>
         </div>
-        <div className="flex items-center justify-between border-t border-line px-4 py-2.5 font-mono text-[0.6rem] uppercase tracking-[0.14em] text-subtle">
-          <span>Myso</span>
-          <span className={cn("hidden sm:inline")}>ESC</span>
+
+        {/* Results List */}
+        <div className="max-h-96 overflow-y-auto p-2 space-y-1">
+          {results.length === 0 ? (
+            <div className="py-12 text-center text-xs text-muted">
+              Không tìm thấy kết quả phù hợp cho &ldquo;{query}&rdquo;
+            </div>
+          ) : (
+            results.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={localePath(locale, item.href)}
+                  onClick={onClose}
+                  className="flex items-center justify-between p-3 rounded-2xl hover:bg-canvas transition group"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-9 w-9 rounded-xl bg-accent/10 border border-accent/20 text-accent flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition">
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-ink group-hover:text-accent transition truncate">
+                          {item.title}
+                        </span>
+                        <span className="rounded-full bg-elevated px-2 py-0.5 text-[0.6rem] font-mono text-muted">
+                          {item.category}
+                        </span>
+                      </div>
+                      <p className="text-[0.68rem] text-muted truncate mt-0.5">
+                        {item.description}
+                      </p>
+                    </div>
+                  </div>
+                  <CornerDownLeft className="h-3.5 w-3.5 text-muted opacity-0 group-hover:opacity-100 transition" />
+                </Link>
+              );
+            })
+          )}
         </div>
       </div>
     </div>
