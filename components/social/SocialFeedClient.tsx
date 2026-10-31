@@ -38,6 +38,7 @@ import type { Locale } from "@/lib/i18n/settings";
 import { localePath } from "@/lib/i18n/settings";
 import { AntiSpamCaptcha } from "@/components/security/AntiSpamCaptcha";
 import { RichContentRenderer } from "@/components/content/RichContentRenderer";
+import { RichTextEditor } from "@/components/editor/RichTextEditor";
 import { getOrCreateAnonymousIdentity, type AnonymousIdentity } from "@/lib/anonymous";
 import { inspectContent } from "@/lib/moderation";
 import { DoodleEmojiModal } from "@/components/social/DoodleEmojiModal";
@@ -84,6 +85,12 @@ interface SocialCommentItem {
   created_at: string;
 }
 
+interface TranslationData {
+  text: string;
+  sourceLang: string;
+  provider: string;
+}
+
 export function SocialFeedClient({
   initialPosts = [],
   locale,
@@ -114,9 +121,12 @@ export function SocialFeedClient({
   // Analytics modal state
   const [analyticsPost, setAnalyticsPost] = useState<SocialPostItem | null>(null);
 
-  // Translations cache
-  const [translatedPosts, setTranslatedPosts] = useState<Record<string, string>>({});
+  // Translations cache for posts & comments
+  const [translatedPosts, setTranslatedPosts] = useState<Record<string, TranslationData>>({});
   const [translatingPostId, setTranslatingPostId] = useState<string | null>(null);
+
+  const [translatedComments, setTranslatedComments] = useState<Record<string, TranslationData>>({});
+  const [translatingCommentId, setTranslatingCommentId] = useState<string | null>(null);
 
   // User interaction states
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
@@ -216,7 +226,6 @@ export function SocialFeedClient({
       setUploadProgressMsg(null);
     } finally {
       setIsUploadingMedia(false);
-      // Reset input value so same file can be re-selected if desired
       e.target.value = "";
     }
   };
@@ -241,7 +250,7 @@ export function SocialFeedClient({
 
     setPosting(true);
     const mediaUrls = uploadedMedia.map((m) => m.url);
-    const author = anonIdentity || { displayName: "Thành viên Myso", handle: "user" };
+    const author = anonIdentity || { displayName: "Thành viên Mythos", handle: "user" };
 
     const optimisticPost: SocialPostItem = {
       id: `post-local-${Date.now()}`,
@@ -460,7 +469,38 @@ export function SocialFeedClient({
     setSubmittingComment((prev) => ({ ...prev, [postId]: false }));
   };
 
-  // Translation handler
+  // Helper for language label
+  const getLanguageName = (code: string) => {
+    const names: Record<string, string> = {
+      en: "Tiếng Anh",
+      ja: "Tiếng Nhật",
+      zh: "Tiếng Trung",
+      "zh-cn": "Tiếng Trung",
+      vi: "Tiếng Việt",
+      fr: "Tiếng Pháp",
+      de: "Tiếng Đức",
+      es: "Tiếng Tây Ban Nha",
+      ko: "Tiếng Hàn",
+    };
+    return names[code.toLowerCase()] || code.toUpperCase();
+  };
+
+  const getTranslateButtonLabel = (isTranslated: boolean, isTranslating: boolean) => {
+    if (isTranslating) return "Đang dịch...";
+    if (isTranslated) return "Xem bản gốc";
+    switch (locale) {
+      case "en":
+        return "Translate";
+      case "ja":
+        return "翻訳する";
+      case "zh-CN":
+        return "翻译";
+      default:
+        return "Dịch";
+    }
+  };
+
+  // Translation handler for posts
   const handleTranslatePost = async (postId: string, text: string) => {
     if (translatedPosts[postId]) {
       setTranslatedPosts((prev) => {
@@ -481,11 +521,59 @@ export function SocialFeedClient({
       if (res.ok) {
         const data = await res.json();
         if (data.translatedText) {
-          setTranslatedPosts((prev) => ({ ...prev, [postId]: data.translatedText }));
+          setTranslatedPosts((prev) => ({
+            ...prev,
+            [postId]: {
+              text: data.translatedText,
+              sourceLang: data.sourceLang || "auto",
+              provider: data.provider || "AI Engine",
+            },
+          }));
         }
       }
-    } catch {}
-    setTranslatingPostId(null);
+    } catch (err) {
+      console.error("Post translation error:", err);
+    } finally {
+      setTranslatingPostId(null);
+    }
+  };
+
+  // Translation handler for comments
+  const handleTranslateComment = async (commentId: string, text: string) => {
+    if (translatedComments[commentId]) {
+      setTranslatedComments((prev) => {
+        const copy = { ...prev };
+        delete copy[commentId];
+        return copy;
+      });
+      return;
+    }
+
+    setTranslatingCommentId(commentId);
+    try {
+      const res = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, targetLang: locale }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.translatedText) {
+          setTranslatedComments((prev) => ({
+            ...prev,
+            [commentId]: {
+              text: data.translatedText,
+              sourceLang: data.sourceLang || "auto",
+              provider: data.provider || "AI Engine",
+            },
+          }));
+        }
+      }
+    } catch (err) {
+      console.error("Comment translation error:", err);
+    } finally {
+      setTranslatingCommentId(null);
+    }
   };
 
   // Report Submission
@@ -519,7 +607,6 @@ export function SocialFeedClient({
     }
   };
 
-  // Helper to check if a URL is video
   const isVideoUrl = (url: string) => {
     return /\.(mp4|webm|ogg|mov)$/i.test(url) || url.includes("video/");
   };
@@ -560,7 +647,7 @@ export function SocialFeedClient({
               className="flex items-center gap-3.5 px-4 py-3 rounded-2xl text-muted hover:text-ink hover:bg-canvas text-sm font-semibold transition"
             >
               <Sparkles className="h-5 w-5 text-accent" />
-              <span>Bách Khoa Myso Wiki</span>
+              <span>Bách Khoa Mythos Wiki</span>
             </Link>
 
             <Link
@@ -621,7 +708,7 @@ export function SocialFeedClient({
               />
               <div className="min-w-0">
                 <span className="font-display text-xs font-bold text-ink truncate block">
-                  {anonIdentity ? anonIdentity.displayName : "Thành viên Myso"}
+                  {anonIdentity ? anonIdentity.displayName : "Thành viên Mythos"}
                 </span>
                 <span className="font-mono text-[0.68rem] text-subtle truncate block">
                   @{anonIdentity ? anonIdentity.handle : "user"}
@@ -637,7 +724,7 @@ export function SocialFeedClient({
           </div>
         </nav>
 
-        {/* Center Main Feed (Mobile & Foldable: 12 cols, iPad: 7 cols, Desktop: 6 cols) */}
+        {/* Center Main Feed (Mobile: 12 cols, iPad: 7 cols, Desktop: 6 cols) */}
         <main className="col-span-1 md:col-span-7 xl:col-span-6 space-y-4">
           {/* Real-time Search Bar */}
           <div className="relative">
@@ -664,9 +751,9 @@ export function SocialFeedClient({
             {[
               { id: "all", label: "Dành cho bạn 🔥" },
               { id: "ai", label: "Công nghệ & AI" },
-              { id: "science", label: "Khoa học" },
-              { id: "tech", label: "Lập trình" },
-              { id: "startup", label: "Khởi nghiệp" },
+              { id: "science", label: "Khoa học Chạy bộ" },
+              { id: "tech", label: "Kỹ thuật & Dinh dưỡng" },
+              { id: "startup", label: "Câu lạc bộ & Giải đấu" },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -682,21 +769,20 @@ export function SocialFeedClient({
             ))}
           </div>
 
-          {/* Post Composer with Direct File Upload */}
+          {/* Professional Rich Text Editor Post Composer */}
           <div className="rounded-3xl border border-line bg-surface p-4 sm:p-5 shadow-sm space-y-3">
             <div className="flex items-start gap-3">
               <img
                 src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80"
                 alt="My avatar"
-                className="h-10 w-10 rounded-full object-cover border border-line shrink-0"
+                className="h-10 w-10 rounded-full object-cover border border-line shrink-0 mt-1"
               />
               <div className="flex-1 min-w-0 space-y-2">
-                <textarea
-                  rows={3}
+                {/* Professional Rich Text Editor */}
+                <RichTextEditor
                   value={postContent}
-                  onChange={(e) => setPostContent(e.target.value)}
-                  placeholder="Bạn đang nghĩ gì? Chia sẻ ý tưởng, đính kèm ảnh/video từ máy (in đậm **chữ**, liên kết, hashtag)..."
-                  className="w-full bg-transparent text-sm sm:text-base text-ink placeholder:text-subtle focus:outline-none resize-none leading-relaxed"
+                  onChange={setPostContent}
+                  locale={locale}
                 />
 
                 {/* Selected Custom Icon / Doodle Preview */}
@@ -775,8 +861,8 @@ export function SocialFeedClient({
 
             {/* Quick Hashtags Chips */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[0.7rem] font-mono text-muted scrollbar-none">
-              <span className="text-subtle font-semibold">Gợi ý:</span>
-              {["#Myso", "#AI", "#KhoaHoc", "#CongNghe", "#KhoiNghiep"].map((tag) => (
+              <span className="text-subtle font-semibold">Chủ đề gợi ý:</span>
+              {["#MythosRunning", "#Marathon", "#Pacing", "#DinhDuong", "#HoiPhuc"].map((tag) => (
                 <button
                   key={tag}
                   type="button"
@@ -812,7 +898,7 @@ export function SocialFeedClient({
                   onClick={() => docInputRef.current?.click()}
                   disabled={isUploadingMedia}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-line bg-canvas hover:border-accent text-xs font-semibold text-ink transition active:scale-95"
-                  title="Chọn tệp tài liệu PDF, DOC, ZIP từ thiết bị"
+                  title="Chọn tệp tài liệu PDF, GPX, ZIP từ thiết bị"
                 >
                   <Paperclip className="h-4 w-4 text-teal" />
                   <span className="hidden sm:inline">Tệp đính kèm</span>
@@ -846,7 +932,7 @@ export function SocialFeedClient({
                 className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs sm:text-sm font-semibold text-white dark:text-[#04101F] hover:opacity-90 transition disabled:opacity-40 shadow-sm active:scale-95"
               >
                 <Send className="h-3.5 w-3.5" />
-                <span>{posting ? "Đang đăng..." : "Đăng ngay"}</span>
+                <span>{posting ? "Đang xuất bản..." : "Xuất bản bài viết"}</span>
               </button>
             </div>
           </div>
@@ -865,8 +951,9 @@ export function SocialFeedClient({
                 const isCommentsExpanded = expandedPostComments[post.id] || false;
                 const postComments = commentsMap[post.id] || [];
                 const isTranslating = translatingPostId === post.id;
-                const isTranslated = !!translatedPosts[post.id];
-                const displayContent = translatedPosts[post.id] || post.content;
+                const translation = translatedPosts[post.id];
+                const isTranslated = !!translation;
+                const displayContent = translation?.text || post.content;
 
                 return (
                   <article
@@ -897,7 +984,7 @@ export function SocialFeedClient({
                             {/* Monetized badge */}
                             {post.monetized && (
                               <span className="inline-flex items-center gap-1 text-[0.62rem] font-mono text-amber-500 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
-                                ✨ Kiếm Tiền
+                                ✨ Tác giả Xác minh
                               </span>
                             )}
                           </div>
@@ -925,17 +1012,24 @@ export function SocialFeedClient({
                           </div>
                         )}
 
-                        {/* Translate button */}
+                        {/* Real AI Translation Button */}
                         <button
                           type="button"
                           onClick={() => handleTranslatePost(post.id, post.content)}
-                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[0.7rem] font-mono transition ${
-                            isTranslated ? "bg-accent/15 text-accent font-bold" : "text-subtle hover:text-ink hover:bg-canvas"
+                          disabled={isTranslating}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-mono transition ${
+                            isTranslated
+                              ? "bg-accent/15 text-accent font-bold"
+                              : "text-subtle hover:text-ink hover:bg-canvas"
                           }`}
-                          title="Dịch nội dung sang ngôn ngữ hiện tại"
+                          title={isTranslated ? "Xem bản gốc" : "Dịch nội dung bài viết"}
                         >
-                          <Languages className="h-3.5 w-3.5" />
-                          <span>{isTranslating ? "Đang dịch..." : isTranslated ? "Xem bản gốc" : "Dịch"}</span>
+                          {isTranslating ? (
+                            <Loader2 className="h-3 w-3 animate-spin text-accent" />
+                          ) : (
+                            <Languages className="h-3.5 w-3.5" />
+                          )}
+                          <span>{getTranslateButtonLabel(isTranslated, isTranslating)}</span>
                         </button>
 
                         <button
@@ -949,15 +1043,25 @@ export function SocialFeedClient({
                       </div>
                     </div>
 
-                    {/* Post Content using RichContentRenderer */}
+                    {/* Post Content rendered through RichContentRenderer */}
                     <div className="text-sm sm:text-base leading-relaxed">
                       <RichContentRenderer content={displayContent} />
                     </div>
 
+                    {/* Translation Information Banner */}
                     {isTranslated && (
-                      <p className="text-[0.68rem] font-mono text-teal">
-                        ✓ Bản dịch tự động hỗ trợ bởi AI · Giữ tính toàn vẹn nội dung gốc
-                      </p>
+                      <div className="flex items-center justify-between text-[0.68rem] font-mono text-teal p-2 rounded-xl bg-teal/5 border border-teal/20">
+                        <span>
+                          ✓ Đã dịch từ {getLanguageName(translation.sourceLang)} sang {getLanguageName(locale)} ({translation.provider})
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleTranslatePost(post.id, post.content)}
+                          className="underline hover:text-teal/80 font-bold ml-2"
+                        >
+                          Xem bản gốc
+                        </button>
+                      </div>
                     )}
 
                     {/* Media / Video / File Gallery */}
@@ -977,7 +1081,7 @@ export function SocialFeedClient({
                               </div>
                             );
                           }
-                          if (/\.(pdf|doc|docx|zip|txt)$/i.test(url)) {
+                          if (/\.(pdf|doc|docx|zip|txt|gpx)$/i.test(url)) {
                             return (
                               <a
                                 key={idx}
@@ -1076,7 +1180,7 @@ export function SocialFeedClient({
                       </button>
                     </div>
 
-                    {/* Inline Comments Section */}
+                    {/* Inline Comments Section with Independent Comment Translation */}
                     {isCommentsExpanded && (
                       <div className="pt-3 border-t border-line space-y-3">
                         <div className="text-[0.68rem] font-mono text-subtle flex items-center justify-between">
@@ -1097,7 +1201,7 @@ export function SocialFeedClient({
                             onKeyDown={(e) => {
                               if (e.key === "Enter") handleSendComment(post.id);
                             }}
-                            placeholder="Viết phản hồi công khai (Enter để gửi)..."
+                            placeholder="Viết phản hồi (Enter để gửi)..."
                             className="flex-1 rounded-xl border border-line bg-canvas px-3.5 py-2 text-xs text-ink placeholder:text-subtle focus:outline-none focus:border-accent"
                           />
                           <button
@@ -1110,31 +1214,61 @@ export function SocialFeedClient({
                           </button>
                         </div>
 
-                        {/* Comments List from DB */}
+                        {/* Comments List with Translation */}
                         <div className="space-y-2 pt-1">
                           {postComments.length === 0 ? (
                             <p className="text-[0.72rem] text-subtle font-mono text-center py-2">
                               Chưa có bình luận. Hãy là người đầu tiên bình luận!
                             </p>
                           ) : (
-                            postComments.map((c) => (
-                              <div key={c.id} className="rounded-2xl border border-line/60 bg-canvas/40 p-2.5 flex gap-2.5 text-xs">
-                                <div className="grid h-6 w-6 place-items-center rounded-full bg-accent/15 text-accent text-[0.65rem] font-bold shrink-0">
-                                  {c.author_name.charAt(0)}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between">
-                                    <span className="font-bold text-ink">{c.author_name}</span>
-                                    <span className="text-[0.62rem] font-mono text-subtle">
-                                      {new Date(c.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                                    </span>
+                            postComments.map((c) => {
+                              const cTranslation = translatedComments[c.id];
+                              const isCTranslated = !!cTranslation;
+                              const isCTranslating = translatingCommentId === c.id;
+                              const commentContent = cTranslation?.text || c.content;
+
+                              return (
+                                <div key={c.id} className="rounded-2xl border border-line/60 bg-canvas/40 p-2.5 flex gap-2.5 text-xs">
+                                  <div className="grid h-6 w-6 place-items-center rounded-full bg-accent/15 text-accent text-[0.65rem] font-bold shrink-0">
+                                    {c.author_name.charAt(0)}
                                   </div>
-                                  <div className="text-muted mt-0.5">
-                                    <RichContentRenderer content={c.content} />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-bold text-ink">{c.author_name}</span>
+                                      <div className="flex items-center gap-2">
+                                        {/* Comment translation button */}
+                                        <button
+                                          type="button"
+                                          onClick={() => handleTranslateComment(c.id, c.content)}
+                                          disabled={isCTranslating}
+                                          className="text-[0.65rem] font-mono text-subtle hover:text-accent flex items-center gap-1 transition"
+                                          title={isCTranslated ? "Xem bản gốc" : "Dịch bình luận"}
+                                        >
+                                          {isCTranslating ? (
+                                            <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                                          ) : (
+                                            <Languages className="h-2.5 w-2.5" />
+                                          )}
+                                          <span>{isCTranslated ? "Gốc" : "Dịch"}</span>
+                                        </button>
+
+                                        <span className="text-[0.62rem] font-mono text-subtle">
+                                          {new Date(c.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <div className="text-muted mt-0.5">
+                                      <RichContentRenderer content={commentContent} />
+                                    </div>
+                                    {isCTranslated && (
+                                      <div className="text-[0.6rem] font-mono text-teal mt-0.5">
+                                        ✓ Đã dịch từ {getLanguageName(cTranslation.sourceLang)}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
-                              </div>
-                            ))
+                              );
+                            })
                           )}
                         </div>
                       </div>
@@ -1153,7 +1287,7 @@ export function SocialFeedClient({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Flame className="h-5 w-5 text-amber-500 fill-amber-500" />
-                <h4 className="font-display text-sm font-bold text-ink">Chuỗi Tương Tác</h4>
+                <h4 className="font-display text-sm font-bold text-ink">Chuỗi Ngày Chạy Bộ</h4>
               </div>
               <span className="font-mono text-xs font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/30">
                 {streakCount} NGÀY 🔥
@@ -1161,7 +1295,7 @@ export function SocialFeedClient({
             </div>
 
             <p className="text-xs text-muted leading-relaxed">
-              Duy trì chuỗi tương tác mỗi ngày để nhận huy hiệu Tác giả uy tín và mở khóa đặc quyền cộng đồng.
+              Duy trì chuỗi tương tác và hoạt động mỗi ngày để nhận huy hiệu Runner uy tín và mở khóa đặc quyền câu lạc bộ.
             </p>
 
             <button
@@ -1192,15 +1326,15 @@ export function SocialFeedClient({
           <div className="rounded-3xl border border-line bg-surface p-5 shadow-sm space-y-3">
             <div className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-accent" />
-              <h4 className="font-display text-sm font-bold text-ink">Xu Hướng Thịnh Hành</h4>
+              <h4 className="font-display text-sm font-bold text-ink">Chủ Đề Nổi Bật</h4>
             </div>
 
             <div className="divide-y divide-line/60">
               {[
-                { tag: "#AI_Agents_2026", count: "12.4K thảo luận", domain: "Công nghệ" },
-                { tag: "#WebAssembly_Rust", count: "8.7K thảo luận", domain: "Lập trình" },
-                { tag: "#BiohackingGiacNgu", count: "6.3K thảo luận", domain: "Khoa học" },
-                { tag: "#MysoEcosystem", count: "4.9K thảo luận", domain: "Cộng đồng" },
+                { tag: "#Sub4Marathon", count: "14.2K thảo luận", domain: "Pacing & Kỷ Lục" },
+                { tag: "#EasyRun8020", count: "9.8K thảo luận", domain: "Phương Pháp Chạy" },
+                { tag: "#CarbonPlatedShoes", count: "7.1K thảo luận", domain: "Thiết Bị & Giày" },
+                { tag: "#MythosRunning", count: "5.4K thảo luận", domain: "Cộng Đồng" },
               ].map((trend, i) => (
                 <div key={i} className="py-2.5 first:pt-1 last:pb-0">
                   <span className="text-[0.65rem] font-mono text-subtle block">{trend.domain}</span>
@@ -1220,10 +1354,10 @@ export function SocialFeedClient({
           <div className="rounded-3xl border border-line bg-surface/60 p-4 text-xs space-y-2">
             <div className="flex items-center gap-2 text-teal font-semibold">
               <ShieldCheck className="h-4 w-4" />
-              <span>Cam kết minh bạch & Pháp luật</span>
+              <span>Tiêu Chuẩn & Minh Bạch Thể Thao</span>
             </div>
             <p className="text-[0.7rem] text-muted leading-relaxed">
-              Myso bảo vệ dữ liệu người dùng hợp pháp, nghiêm cấm các hành vi lừa đảo và cam kết phối hợp với Cơ quan Chức năng (CQCN) khi có vi phạm.
+              Mythos Running bảo vệ dữ liệu người dùng, cam kết môi trường thể thao trong sạch, văn minh và hỗ trợ Runners toàn diện.
             </p>
             <div className="flex items-center gap-3 pt-1 font-mono text-[0.68rem]">
               <Link href={localePath(locale, "/legal/standards")} className="text-accent underline font-semibold">
@@ -1231,7 +1365,7 @@ export function SocialFeedClient({
               </Link>
               <span>·</span>
               <Link href={localePath(locale, "/legal/faq")} className="text-accent underline font-semibold">
-                FAQ & Kiếm tiền
+                FAQ & Tài liệu
               </Link>
             </div>
           </div>
@@ -1274,12 +1408,12 @@ export function SocialFeedClient({
             {reportSuccess ? (
               <div className="rounded-2xl border border-teal/40 bg-teal/10 p-5 text-center text-xs font-mono text-teal space-y-2">
                 <CheckCircle2 className="mx-auto h-8 w-8 text-teal" />
-                <p>Báo cáo của bạn đã được gửi thành công đến Đội ngũ Kiểm duyệt Myso!</p>
+                <p>Báo cáo của bạn đã được gửi thành công đến Đội ngũ Kiểm duyệt Mythos!</p>
               </div>
             ) : (
               <form onSubmit={handleSendReport} className="space-y-3.5">
                 <p className="text-xs text-muted leading-relaxed">
-                  Vui lòng chọn lý do báo cáo bài viết để hỗ trợ đội ngũ kiểm duyệt xử lý theo tiêu chuẩn pháp luật:
+                  Vui lòng chọn lý do báo cáo bài viết để hỗ trợ đội ngũ kiểm duyệt:
                 </p>
 
                 <div className="space-y-2 text-xs">

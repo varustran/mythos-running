@@ -1,16 +1,16 @@
 export const siteConfig = {
-  name: "Myso",
-  legalName: "Myso Network",
-  tagline: "Open Social Network · Encyclopedia · Encrypted Chat · Arcade",
+  name: "Mythos Running",
+  legalName: "Mythos Running Collective",
+  tagline: "International Running Community · Editorial Publishing · Science & Culture",
   description:
-    "Myso is a next-generation open social network, community encyclopedia, encrypted messaging platform, and interactive gaming hub.",
+    "Mythos Running is an international editorial publishing platform and community ecosystem for runners worldwide.",
   url: process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://mythos-running.vercel.app",
   locale: "vi",
   github: "https://github.com/varustran/mythos-running",
   social: [
     { label: "X (Twitter)", href: "https://x.com/" },
     { label: "GitHub", href: "https://github.com/varustran/mythos-running" },
-    { label: "Telegram", href: "https://t.me/" },
+    { label: "Strava", href: "https://www.strava.com/" },
   ],
 };
 
@@ -29,7 +29,7 @@ export const footerGroups = [
     titleKey: "explore",
     links: [
       { label: "Bảng tin Mạng xã hội", href: "/" },
-      { label: "Bách khoa Myso Wiki", href: "/wiki" },
+      { label: "Bách khoa Mythos Wiki", href: "/wiki" },
       { label: "Chat mã hóa E2EE", href: "/chat" },
       { label: "Ghi chú nhanh bảo mật", href: "/notes" },
       { label: "Diễn đàn thảo luận", href: "/blog" },
@@ -48,7 +48,7 @@ export const footerGroups = [
   {
     titleKey: "legal",
     links: [
-      { label: "Tiêu chuẩn cộng đồng & CQCN", href: "/legal/standards" },
+      { label: "Tiêu chuẩn cộng đồng & Pháp lý", href: "/legal/standards" },
       { label: "Bảo mật & Quyền riêng tư", href: "/privacy" },
       { label: "Điều khoản sử dụng", href: "/terms" },
       { label: "Miễn trừ trách nhiệm", href: "/disclaimer" },

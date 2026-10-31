@@ -29,9 +29,9 @@ export function MobileNav({ locale, role }: { locale: Locale; role?: string | nu
         <div className="fixed inset-0 z-[70] bg-canvas/98 backdrop-blur-2xl lg:hidden flex flex-col">
           <div className="flex h-16 items-center justify-between border-b border-line px-5">
             <div className="flex items-center gap-2">
-              <span className="font-display text-lg font-black tracking-tight text-ink">Myso</span>
+              <span className="font-display text-lg font-black tracking-tight text-ink">Mythos</span>
               <span className="font-mono text-[0.65rem] text-accent border border-accent/40 bg-accent/10 px-2 py-0.5 rounded-full font-bold">
-                PLATFORM
+                RUNNING
               </span>
             </div>
             <button

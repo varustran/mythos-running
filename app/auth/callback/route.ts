@@ -4,8 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const nextParam = url.searchParams.get("next") || "/vi/admin";
-  const next = nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "/vi/admin";
+  const nextParam = url.searchParams.get("next") || "/vi";
+  const next = nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "/vi";
 
   if (!code) {
     return NextResponse.redirect(new URL("/vi/login?error=missing_code", url.origin));

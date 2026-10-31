@@ -20,33 +20,44 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const t = getT(l, "home");
   const meta = buildMetadata({
     locale: l,
-    title: "Myso — Không Gian Cho Mọi Ý Tưởng",
-    description: "Mạng xã hội mở, bách khoa tri thức số, phòng chat mã hóa và nền tảng sáng tạo nội dung đa lĩnh vực.",
+    title: "Mythos Running — Nền Tảng Xuất Bản & Kết Nối Cộng Đồng Chạy Bộ Toàn Cầu",
+    description: "Không gian xuất bản bài viết chuyên nghiệp, khoa học chạy bộ, công cụ tính toán và kết nối cộng đồng runners quốc tế.",
   });
   return {
     ...meta,
     title: {
-      default: "Myso — Không Gian Cho Mọi Ý Tưởng",
-      template: "%s · Myso",
+      default: "Mythos Running — Nền Tảng Chạy Bộ & Xuất Bản Tri Thức Thể Thao",
+      template: "%s · Mythos Running",
     },
-    applicationName: "Myso",
-    authors: [{ name: "Myso Network" }],
-    creator: "Myso",
+    applicationName: "Mythos Running",
+    authors: [{ name: "Mythos Running Collective" }],
+    creator: "Mythos Running",
     keywords: [
-      "mạng xã hội",
-      "myso",
-      "ý tưởng",
-      "bách khoa số",
-      "wiki",
-      "công nghệ",
-      "AI",
-      "chat mã hóa",
-      "thảo luận",
-      "kiếm tiền sáng tạo",
+      "mythos running",
+      "chạy bộ",
+      "marathon",
+      "running science",
+      "cộng đồng chạy bộ",
+      "rich text editor",
+      "pace calculator",
+      "strava",
+      "thể thao",
     ],
     icons: {
-      icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
-      apple: [{ url: "/brand/mark.svg" }],
+      icon: [
+        { url: "/favicon.ico", sizes: "32x32" },
+        { url: "/favicon.svg", type: "image/svg+xml" },
+        { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
+      ],
+      apple: [
+        { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+      ],
+      other: [
+        {
+          rel: "apple-touch-icon-precomposed",
+          url: "/apple-touch-icon.png",
+        },
+      ],
     },
   };
 }
@@ -57,7 +68,7 @@ export const viewport: Viewport = {
   viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#FFFFFF" },
-    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+    { media: "(prefers-color-scheme: dark)", color: "#080D16" },
   ],
 };
 
