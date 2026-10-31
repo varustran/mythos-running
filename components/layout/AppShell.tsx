@@ -119,9 +119,7 @@ export function AppShell({ children, locale }: AppShellProps) {
   };
 
   const profileHref = profile
-    ? status === "profile_incomplete"
-      ? localePath(locale, "/onboarding")
-      : localePath(locale, `/u/${profile.username}`)
+    ? localePath(locale, `/u/${profile.username}`)
     : localePath(locale, "/login");
 
   const navItems = [
@@ -202,24 +200,24 @@ export function AppShell({ children, locale }: AppShellProps) {
                   <Link
                     key={item.key}
                     href={item.href}
-                    className={`group flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-semibold transition ${
+                    className={`group flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-semibold transition-all duration-200 active:scale-95 ${
                       isActive
-                        ? "bg-[#18181B] text-[#FAFAFA] border border-[#27272A] shadow-sm"
-                        : "text-[#A1A1AA] hover:text-[#FAFAFA] hover:bg-[#18181B]/50"
+                        ? "bg-[#18181B] text-[#FAFAFA] border border-[#27272A] shadow-[0_0_15px_rgba(245,158,11,0.12)]"
+                        : "text-[#A1A1AA] hover:text-[#FAFAFA] hover:bg-[#18181B]/60"
                     }`}
                   >
                     <div className="flex items-center gap-3">
                       <Icon
-                        className={`h-5 w-5 transition ${
+                        className={`h-5 w-5 transition-transform duration-200 ${
                           isActive
-                            ? "text-amber-400 scale-105"
-                            : "text-[#71717A] group-hover:text-[#FAFAFA]"
+                            ? "text-amber-400 scale-110"
+                            : "text-[#71717A] group-hover:text-[#FAFAFA] group-hover:scale-105"
                         }`}
                       />
                       <span>{item.label}</span>
                     </div>
                     {item.badge && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 animate-pulse">
                         {item.badge}
                       </span>
                     )}
@@ -232,7 +230,7 @@ export function AppShell({ children, locale }: AppShellProps) {
             <button
               onClick={handleCreatePostClick}
               type="button"
-              className="mt-2 w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-sm bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black shadow-lg shadow-amber-500/20 active:scale-[0.98] transition cursor-pointer"
+              className="mt-2 w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-sm bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 bg-[length:200%_auto] hover:animate-shimmer active:scale-95 transition-all shadow-lg shadow-amber-500/20 hover:shadow-[0_0_25px_rgba(245,158,11,0.35)] cursor-pointer"
             >
               <PlusCircle className="h-4 w-4" />
               <span>{locale === "vi" ? "Tạo bài viết" : "New Post"}</span>

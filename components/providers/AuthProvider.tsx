@@ -4,6 +4,11 @@ import { createContext, useContext, useEffect, useState, useCallback, useMemo } 
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import type { AccountSessionData, UserRole } from "@/lib/supabase/server";
+import {
+  saveEncryptedSession,
+  getStoredSession,
+  clearStoredSession,
+} from "@/lib/auth/sessionCrypto";
 
 export interface UserProfile {
   id: string;
@@ -63,32 +68,47 @@ export function AuthProvider({
   children: React.ReactNode;
   initialSession?: AccountSessionData;
 }) {
-  const [user, setUser] = useState<User | { id: string; email?: string | null } | null>(
-    initialSession ? initialSession.user : null
-  );
+  const [user, setUser] = useState<User | { id: string; email?: string | null } | null>(() => {
+    if (initialSession?.user) return initialSession.user;
+    if (typeof window !== "undefined") {
+      const stored = getStoredSession();
+      if (stored?.user) return stored.user;
+    }
+    return null;
+  });
 
   const [profile, setProfile] = useState<UserProfile | null>(() => {
-    if (!initialSession?.profile) return null;
-    const p = initialSession.profile;
-    return {
-      id: p.id,
-      user_id: p.userId,
-      email: p.email,
-      username: p.username || "user",
-      full_name: p.fullName || "Thành viên Myso",
-      avatar_url: p.avatarUrl,
-      role: p.role,
-      onboarding_completed: p.onboardingCompleted,
-      onboarding_step: p.onboardingStep,
-      points_balance: p.pointsBalance ?? 0,
-      gold_balance: p.goldBalance ?? 0,
-      wallet_address: p.walletAddress ?? null,
-    };
+    if (initialSession?.profile) {
+      const p = initialSession.profile;
+      return {
+        id: p.id,
+        user_id: p.userId,
+        email: p.email,
+        username: p.username || "user",
+        full_name: p.fullName || "Thành viên Myso",
+        avatar_url: p.avatarUrl,
+        role: p.role,
+        onboarding_completed: p.onboardingCompleted,
+        onboarding_step: p.onboardingStep,
+        points_balance: p.pointsBalance ?? 0,
+        gold_balance: p.goldBalance ?? 0,
+        wallet_address: p.walletAddress ?? null,
+      };
+    }
+    if (typeof window !== "undefined") {
+      const stored = getStoredSession();
+      if (stored?.profile) return stored.profile;
+    }
+    return null;
   });
 
   const [status, setStatus] = useState<AccountStatus>(() => {
     if (initialSession) {
       return initialSession.status;
+    }
+    if (typeof window !== "undefined") {
+      const stored = getStoredSession();
+      if (stored?.status) return stored.status;
     }
     return "initializing";
   });
@@ -97,14 +117,14 @@ export function AuthProvider({
 
   // Fetch or safely initialize profile for an authenticated user
   const syncAccountProfile = useCallback(
-    async (authUser: User) => {
+    async (authUser: User | { id: string; email?: string | null }) => {
       try {
         const res = await fetch("/api/auth/me");
         if (res.ok) {
           const sessionData: AccountSessionData = await res.json();
           if (sessionData.profile) {
             const p = sessionData.profile;
-            setProfile({
+            const newProf: UserProfile = {
               id: p.id,
               user_id: p.userId,
               email: p.email,
@@ -117,8 +137,10 @@ export function AuthProvider({
               points_balance: p.pointsBalance ?? 0,
               gold_balance: p.goldBalance ?? 0,
               wallet_address: p.walletAddress ?? null,
-            });
+            };
+            setProfile(newProf);
             setStatus(sessionData.status);
+            saveEncryptedSession(authUser, newProf);
             return;
           }
 
@@ -129,7 +151,7 @@ export function AuthProvider({
               const initData = await initRes.json();
               if (initData.profile) {
                 const ip = initData.profile;
-                setProfile({
+                const newProf: UserProfile = {
                   id: ip.id,
                   user_id: ip.user_id,
                   email: ip.email,
@@ -137,13 +159,15 @@ export function AuthProvider({
                   full_name: ip.full_name,
                   avatar_url: ip.avatar_url,
                   role: ip.role,
-                  onboarding_completed: Boolean(ip.onboarding_completed),
-                  onboarding_step: ip.onboarding_step || 1,
+                  onboarding_completed: true,
+                  onboarding_step: 3,
                   points_balance: Number(ip.points_balance || 0),
                   gold_balance: Number(ip.gold_balance || 0),
                   wallet_address: ip.wallet_address || null,
-                });
-                setStatus(ip.onboarding_completed ? "profile_complete" : "profile_incomplete");
+                };
+                setProfile(newProf);
+                setStatus("profile_complete");
+                saveEncryptedSession(authUser, newProf);
                 return;
               }
             }
@@ -154,12 +178,13 @@ export function AuthProvider({
         if (supabase) {
           const { data: dbProf } = await supabase
             .from("profiles")
-            .select("id, user_id, email, username, full_name, avatar_url, role, onboarding_completed, onboarding_step, points_balance, gold_balance, wallet_address")
+            .select("id, user_id, email, username, full_name, avatar_url, role, points_balance, gold_balance, wallet_address")
             .or(`user_id.eq.${authUser.id},id.eq.${authUser.id},email.eq.${authUser.email}`)
             .maybeSingle();
 
           if (dbProf) {
-            setProfile({
+            const isCompleted = Boolean(dbProf.username && dbProf.full_name);
+            const newProf: UserProfile = {
               id: dbProf.id,
               user_id: dbProf.user_id,
               email: dbProf.email,
@@ -167,13 +192,15 @@ export function AuthProvider({
               full_name: dbProf.full_name || "Thành viên Myso",
               avatar_url: dbProf.avatar_url,
               role: (dbProf.role as UserRole) || "user",
-              onboarding_completed: Boolean(dbProf.onboarding_completed),
-              onboarding_step: dbProf.onboarding_step || 1,
+              onboarding_completed: isCompleted,
+              onboarding_step: isCompleted ? 3 : 1,
               points_balance: Number(dbProf.points_balance || 0),
               gold_balance: Number(dbProf.gold_balance || 0),
               wallet_address: dbProf.wallet_address || null,
-            });
-            setStatus(dbProf.onboarding_completed ? "profile_complete" : "profile_incomplete");
+            };
+            setProfile(newProf);
+            setStatus(isCompleted ? "profile_complete" : "profile_incomplete");
+            saveEncryptedSession(authUser, newProf);
             return;
           }
         }
@@ -188,61 +215,49 @@ export function AuthProvider({
 
   const refreshProfile = useCallback(async () => {
     if (user) {
-      if ("aud" in user) {
-        await syncAccountProfile(user as User);
-      } else {
-        const res = await fetch("/api/auth/me");
-        if (res.ok) {
-          const sessionData: AccountSessionData = await res.json();
-          if (sessionData.profile) {
-            const p = sessionData.profile;
-            setProfile({
-              id: p.id,
-              user_id: p.userId,
-              email: p.email,
-              username: p.username || "user",
-              full_name: p.fullName || "Thành viên Myso",
-              avatar_url: p.avatarUrl,
-              role: p.role,
-              onboarding_completed: p.onboardingCompleted,
-              onboarding_step: p.onboardingStep,
-              points_balance: p.pointsBalance ?? 0,
-              gold_balance: p.goldBalance ?? 0,
-              wallet_address: p.walletAddress ?? null,
-            });
-            setStatus(sessionData.status);
-          }
-        }
-      }
+      await syncAccountProfile(user);
     }
   }, [user, syncAccountProfile]);
 
   useEffect(() => {
+    // 1. Immediately hydrate from stored encrypted session if present
+    const stored = getStoredSession();
+    if (stored) {
+      setUser(stored.user);
+      setProfile(stored.profile);
+      setStatus(stored.status);
+    }
+
     if (!supabase) {
-      setStatus("guest");
+      if (!stored) setStatus("guest");
       return;
     }
 
-    // Initial verify
+    // 2. Background verify with Supabase Auth
     supabase.auth.getUser().then(({ data: { user: currentUser } }) => {
       if (currentUser) {
         setUser(currentUser);
         syncAccountProfile(currentUser);
       } else {
-        setUser(null);
-        setProfile(null);
-        setStatus("guest");
+        // Only set guest if there was no active stored session
+        const currentStored = getStoredSession();
+        if (!currentStored) {
+          setUser(null);
+          setProfile(null);
+          setStatus("guest");
+        }
       }
     });
 
-    // Reactive subscription to auth state changes
+    // 3. Reactive subscription to auth state changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         setUser(session.user);
         await syncAccountProfile(session.user);
-      } else {
+      } else if (event === "SIGNED_OUT") {
+        clearStoredSession();
         setUser(null);
         setProfile(null);
         setStatus("guest");
@@ -255,6 +270,7 @@ export function AuthProvider({
   }, [supabase, syncAccountProfile]);
 
   const logout = useCallback(async () => {
+    clearStoredSession();
     if (supabase) {
       await supabase.auth.signOut();
     }

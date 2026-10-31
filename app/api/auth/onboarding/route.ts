@@ -42,9 +42,6 @@ export async function POST(req: Request) {
       updated_at: new Date().toISOString(),
     };
 
-    if (typeof onboarding_step === "number") {
-      updatePayload.onboarding_step = onboarding_step;
-    }
     if (typeof full_name === "string" && full_name.trim()) {
       updatePayload.full_name = full_name.trim();
     }
@@ -54,20 +51,8 @@ export async function POST(req: Request) {
     if (avatar_url !== undefined) {
       updatePayload.avatar_url = avatar_url;
     }
-    if (cover_url !== undefined) {
-      updatePayload.cover_url = cover_url;
-    }
     if (bio !== undefined) {
       updatePayload.bio = bio ? bio.trim() : null;
-    }
-    if (Array.isArray(interests)) {
-      updatePayload.interests = interests;
-    }
-    if (Array.isArray(skills)) {
-      updatePayload.skills = skills;
-    }
-    if (typeof onboarding_completed === "boolean") {
-      updatePayload.onboarding_completed = onboarding_completed;
     }
 
     // Update profile

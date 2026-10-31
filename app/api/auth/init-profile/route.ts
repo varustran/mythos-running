@@ -74,8 +74,6 @@ export async function POST(req: Request) {
       username: chosenUsername,
       avatar_url: user.user_metadata?.avatar_url || null,
       role: isRootAdmin ? "admin" : "user",
-      onboarding_completed: isRootAdmin,
-      onboarding_step: 1,
     };
 
     const { data: created, error: insertError } = await supabase

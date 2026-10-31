@@ -1280,7 +1280,7 @@ export function SocialFeedClient({
                   return (
                     <article
                       key={post.id}
-                      className="p-4 sm:p-5 rounded-2xl border border-[#27272A] bg-[#121215] text-[#FAFAFA] shadow-sm hover:border-[#3F3F46] transition space-y-3"
+                      className="group p-4 sm:p-5 rounded-2xl border border-[#27272A] bg-[#121215] text-[#FAFAFA] shadow-sm hover:border-amber-500/30 hover:shadow-[0_4px_25px_rgba(245,158,11,0.06)] hover:-translate-y-0.5 transition-all duration-300 space-y-3"
                     >
                       {/* Author Header */}
                       <div className="flex items-start justify-between gap-2">
@@ -1423,7 +1423,7 @@ export function SocialFeedClient({
                                   <button
                                     onClick={() => handleUnlockPost(post.id, "gold")}
                                     disabled={unlockingPostId === post.id}
-                                    className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/10 cursor-pointer disabled:opacity-50"
+                                    className="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 bg-[length:200%_auto] hover:animate-shimmer active:scale-95 text-black text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/20 cursor-pointer disabled:opacity-50"
                                   >
                                     <Coins className="h-3.5 w-3.5" />
                                     <span>
@@ -1436,7 +1436,7 @@ export function SocialFeedClient({
                                   <button
                                     onClick={() => handleUnlockPost(post.id, "points")}
                                     disabled={unlockingPostId === post.id}
-                                    className="py-2 px-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                                    className="py-2.5 px-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-95 border border-emerald-500/30 text-emerald-400 text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
                                   >
                                     <Zap className="h-3.5 w-3.5" />
                                     <span>{post.unlock_price_points || 50} pts</span>

@@ -16,6 +16,7 @@ import {
   Upload,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { saveEncryptedSession } from "@/lib/auth/sessionCrypto";
 import { AntiSpamCaptcha } from "@/components/security/AntiSpamCaptcha";
 import { uploadMediaFile } from "@/lib/storage";
 
@@ -124,10 +125,33 @@ export function LoginForm({ locale }: { locale: string }) {
 
       if (!error && data.user) {
         setStatus("verified");
+        try {
+          const { data: prof } = await supabase
+            .from("profiles")
+            .select("id, user_id, email, username, full_name, avatar_url, role, points_balance, gold_balance, wallet_address")
+            .or(`user_id.eq.${data.user.id},id.eq.${data.user.id},email.eq.${data.user.email}`)
+            .maybeSingle();
+          if (prof) {
+            saveEncryptedSession(data.user, {
+              id: prof.id,
+              user_id: prof.user_id || data.user.id,
+              email: prof.email || data.user.email,
+              username: prof.username || "user",
+              full_name: prof.full_name || "Thành viên Myso",
+              avatar_url: prof.avatar_url,
+              role: prof.role || "user",
+              onboarding_completed: true,
+              onboarding_step: 3,
+              points_balance: Number(prof.points_balance || 0),
+              gold_balance: Number(prof.gold_balance || 0),
+              wallet_address: prof.wallet_address || null,
+            });
+          }
+        } catch {}
         setStatusMsg("Đăng nhập thành công! Đang chuyển hướng vào bảng tin...");
         setTimeout(() => {
           window.location.href = `/${locale}`;
-        }, 600);
+        }, 400);
         return;
       }
 
@@ -232,11 +256,27 @@ export function LoginForm({ locale }: { locale: string }) {
       });
     } catch {}
 
+    if (data.user) {
+      saveEncryptedSession(data.user, {
+        id: userId || "",
+        user_id: userId,
+        email: email.trim(),
+        full_name: fullName.trim() || cleanUsername,
+        username: cleanUsername,
+        avatar_url: selectedAvatar,
+        role: email.toLowerCase() === "chuitv1907@gmail.com" ? "admin" : "user",
+        onboarding_completed: true,
+        onboarding_step: 3,
+        points_balance: 100,
+        gold_balance: 0,
+        wallet_address: null,
+      });
+    }
     setStatus("verified");
     setStatusMsg("Tạo tài khoản thành công! Đang tự động chuyển hướng vào Myso...");
     setTimeout(() => {
       window.location.href = `/${locale}`;
-    }, 800);
+    }, 600);
   }
 
   // Verify OTP Code

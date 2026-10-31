@@ -83,7 +83,7 @@ export const getAccountSession = cache(async (): Promise<AccountSessionData> => 
   // Query database profiles table by user_id, id, or email
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, user_id, email, username, full_name, avatar_url, role, onboarding_completed, onboarding_step, points_balance, gold_balance, wallet_address")
+    .select("id, user_id, email, username, full_name, avatar_url, role, points_balance, gold_balance, wallet_address")
     .or(`user_id.eq.${user.id},id.eq.${user.id},email.eq.${user.email}`)
     .maybeSingle();
 
@@ -100,6 +100,8 @@ export const getAccountSession = cache(async (): Promise<AccountSessionData> => 
     ? "admin"
     : (profile.role as UserRole) || "user";
 
+  const isCompleted = Boolean(profile.username && profile.full_name);
+
   const sessionProf: SessionProfile = {
     id: profile.id,
     userId: profile.user_id || user.id,
@@ -108,8 +110,8 @@ export const getAccountSession = cache(async (): Promise<AccountSessionData> => 
     fullName: profile.full_name || user.user_metadata?.full_name || "Thành viên Myso",
     avatarUrl: profile.avatar_url || user.user_metadata?.avatar_url || null,
     role: userRole,
-    onboardingCompleted: Boolean(profile.onboarding_completed || isRootAdmin),
-    onboardingStep: profile.onboarding_step || 1,
+    onboardingCompleted: isCompleted,
+    onboardingStep: isCompleted ? 3 : 1,
     pointsBalance: Number(profile.points_balance || 0),
     goldBalance: Number(profile.gold_balance || 0),
     walletAddress: profile.wallet_address || null,

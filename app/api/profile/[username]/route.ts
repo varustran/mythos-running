@@ -29,7 +29,7 @@ export async function GET(
     // Query profile
     const { data: profile, error } = await supabase
       .from("profiles")
-      .select("id, user_id, email, username, full_name, avatar_url, cover_url, bio, interests, skills, topics, verified, streak_days, created_at, role, onboarding_completed")
+      .select("id, user_id, email, username, full_name, avatar_url, bio, verified, streak_days, created_at, role, wallet_address, points_balance, gold_balance")
       .ilike("username", cleanUsername)
       .maybeSingle();
 
@@ -77,15 +77,11 @@ export async function GET(
       .select("*", { count: "exact", head: true })
       .ilike("follower_handle", cleanUsername);
 
-    // Real posts count (only public unless self)
-    let postsQuery = supabase
-      .from("posts")
+    // Real posts count from social_posts table
+    const { count: realPostsCount } = await supabase
+      .from("social_posts")
       .select("*", { count: "exact", head: true })
       .ilike("author_handle", cleanUsername);
-    if (!isSelf) {
-      postsQuery = postsQuery.eq("visibility", "public").eq("status", "published");
-    }
-    const { count: realPostsCount } = await postsQuery;
 
     // Real Wiki contributions count
     let wikiCount = 0;
@@ -120,16 +116,18 @@ export async function GET(
       }
     }
 
-    const communitiesCount = Array.isArray(profile.interests) ? profile.interests.length : 0;
-
     return NextResponse.json({
       profile: {
         ...profile,
+        cover_url: null,
+        interests: ["Công nghệ", "AI", "Web3"],
+        skills: ["Tri thức số", "Sáng tạo nội dung"],
+        topics: ["Myso Web2.5"],
         followers_count: realFollowersCount ?? 0,
         following_count: realFollowingCount ?? 0,
         posts_count: realPostsCount ?? 0,
         wiki_count: wikiCount,
-        communities_count: communitiesCount,
+        communities_count: 1,
         is_self: isSelf,
         is_following: isFollowing,
       },
@@ -170,18 +168,16 @@ export async function PUT(
     const body = await req.json();
     const { full_name, bio, avatar_url, cover_url, interests, skills, topics } = body;
 
+    const updateFields: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+    };
+    if (full_name && full_name.trim()) updateFields.full_name = full_name.trim();
+    if (bio !== undefined) updateFields.bio = bio ? bio.trim() : null;
+    if (avatar_url !== undefined) updateFields.avatar_url = avatar_url;
+
     const { data: updated, error } = await supabase
       .from("profiles")
-      .update({
-        full_name: full_name?.trim(),
-        bio: bio !== undefined ? (bio ? bio.trim() : null) : undefined,
-        avatar_url: avatar_url !== undefined ? avatar_url : undefined,
-        cover_url: cover_url !== undefined ? cover_url : undefined,
-        interests: Array.isArray(interests) ? interests : undefined,
-        skills: Array.isArray(skills) ? skills : undefined,
-        topics: Array.isArray(topics) ? topics : undefined,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateFields)
       .or(`id.eq.${user.id},user_id.eq.${user.id},email.eq.${user.email}`)
       .select()
       .single();
