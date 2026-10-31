@@ -100,6 +100,9 @@ export const ja: Dictionary = {
   },
   nav: {
     feed: "タイムライン",
+    explore: "探索",
+    quests: "クエスト",
+    wallet: "ウォレット & 収益",
     chat: "暗号化チャット 🔒",
     standards: "規約と法規範",
     home: "ホーム",

@@ -46,6 +46,9 @@ export type SessionProfile = {
   role: UserRole;
   onboardingCompleted: boolean;
   onboardingStep: number;
+  pointsBalance: number;
+  goldBalance: number;
+  walletAddress: string | null;
 };
 
 export type AccountStatus =
@@ -80,7 +83,7 @@ export const getAccountSession = cache(async (): Promise<AccountSessionData> => 
   // Query database profiles table by user_id, id, or email
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, user_id, email, username, full_name, avatar_url, role, onboarding_completed, onboarding_step")
+    .select("id, user_id, email, username, full_name, avatar_url, role, onboarding_completed, onboarding_step, points_balance, gold_balance, wallet_address")
     .or(`user_id.eq.${user.id},id.eq.${user.id},email.eq.${user.email}`)
     .maybeSingle();
 
@@ -107,6 +110,9 @@ export const getAccountSession = cache(async (): Promise<AccountSessionData> => 
     role: userRole,
     onboardingCompleted: Boolean(profile.onboarding_completed || isRootAdmin),
     onboardingStep: profile.onboarding_step || 1,
+    pointsBalance: Number(profile.points_balance || 0),
+    goldBalance: Number(profile.gold_balance || 0),
+    walletAddress: profile.wallet_address || null,
   };
 
   const status: AccountStatus = sessionProf.onboardingCompleted

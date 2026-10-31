@@ -13,8 +13,10 @@ export function formatDate(value: string | Date, locale: Locale) {
     en: "en-GB",
     "zh-CN": "zh-CN",
     ja: "ja-JP",
+    fr: "fr-FR",
+    de: "de-DE",
   };
-  return new Intl.DateTimeFormat(map[locale], {
+  return new Intl.DateTimeFormat(map[locale] || "en-GB", {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -55,7 +57,7 @@ export function parseTimeToSeconds(hours: string | number, minutes: string | num
 
 export function readingTime(markdown: string, locale: Locale) {
   const words = markdown.trim().split(/\s+/).filter(Boolean).length;
-  const wpm = locale === "ja" || locale === "zh-CN" ? 380 : 210;
+  const wpm = locale === "ja" || (locale as string) === "zh" || (locale as string) === "zh-CN" ? 380 : 210;
   return Math.max(1, Math.round(words / wpm));
 }
 

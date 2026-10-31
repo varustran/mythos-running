@@ -15,9 +15,9 @@ export const siteConfig = {
 
 export const navItems = [
   { key: "feed", href: "/" },
-  { key: "wiki", href: "/wiki" },
-  { key: "chat", href: "/chat" },
-  { key: "notes", href: "/notes" },
+  { key: "explore", href: "/explore" },
+  { key: "quests", href: "/quests" },
+  { key: "wallet", href: "/wallet" },
   { key: "standards", href: "/legal/standards" },
 ] as const;
 
@@ -26,18 +26,18 @@ export const footerGroups = [
     titleKey: "explore",
     links: [
       { label: "Bảng tin Mạng xã hội", href: "/" },
-      { label: "Bách khoa Myso Wiki", href: "/wiki" },
-      { label: "Chat mã hóa E2EE", href: "/chat" },
-      { label: "Ghi chú nhanh bảo mật", href: "/notes" },
+      { label: "Khám phá Chủ đề & Tags", href: "/explore" },
+      { label: "Trung tâm Nhiệm vụ (Earn Points)", href: "/quests" },
+      { label: "Ví Đa chuỗi & Doanh thu", href: "/wallet" },
     ],
   },
   {
     titleKey: "creator",
     links: [
-      { label: "Tạo tài khoản & Profile", href: "/login" },
-      { label: "Thiết lập hồ sơ Onboarding", href: "/onboarding" },
+      { label: "Đăng nhập & Tài khoản", href: "/login" },
+      { label: "Thiết lập Onboarding", href: "/onboarding" },
       { label: "Cài đặt tài khoản", href: "/settings" },
-      { label: "Đóng góp bài viết Wiki", href: "/wiki/propose" },
+      { label: "Chính sách Doanh thu 85/15", href: "/monetization" },
     ],
   },
   {
@@ -45,8 +45,9 @@ export const footerGroups = [
     links: [
       { label: "Tiêu chuẩn cộng đồng & Pháp lý", href: "/legal/standards" },
       { label: "Bảo mật & Quyền riêng tư", href: "/privacy" },
-      { label: "Điều khoản sử dụng", href: "/terms" },
+      { label: "Điều khoản dịch vụ", href: "/terms" },
       { label: "Miễn trừ trách nhiệm", href: "/disclaimer" },
+      { label: "Câu hỏi thường gặp (FAQ)", href: "/legal/faq" },
     ],
   },
 ];

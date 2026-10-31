@@ -41,6 +41,7 @@ import {
   BookOpen,
   CornerDownRight,
   User,
+  Coins,
 } from "lucide-react";
 import type { Locale } from "@/lib/i18n/settings";
 import { localePath } from "@/lib/i18n/settings";
@@ -69,6 +70,7 @@ interface UploadedMediaItem {
 
 interface SocialPostItem {
   id: string;
+  author_id?: string | null;
   author_name: string;
   author_handle: string;
   author_avatar?: string | null;
@@ -92,6 +94,16 @@ interface SocialPostItem {
   views_count?: number;
   monetized?: boolean;
   custom_icon?: string | null;
+  is_locked?: boolean;
+  public_preview?: string | null;
+  unlock_price_gold?: number;
+  unlock_price_points?: number;
+  payload_metadata?: {
+    wordsCount: number;
+    codeBlocksCount: number;
+    linksCount: number;
+    attachmentsCount: number;
+  };
   created_at: string;
 }
 
@@ -103,6 +115,7 @@ interface SocialCommentItem {
   author_avatar?: string | null;
   content: string;
   parent_id?: string | null;
+  depth?: number;
   upvotes_count?: number;
   created_at: string;
 }
@@ -142,7 +155,7 @@ export function SocialFeedClient({
   initialPosts?: SocialPostItem[];
   locale: Locale;
 }) {
-  const { user, profile, status: authStatus } = useAuth();
+  const { user, profile, status: authStatus, refreshProfile } = useAuth();
 
   const [posts, setPosts] = useState<SocialPostItem[]>(initialPosts);
   const [wikiArticles, setWikiArticles] = useState<WikiFeedItem[]>([]);
@@ -205,6 +218,21 @@ export function SocialFeedClient({
   const [reportDetails, setReportDetails] = useState("");
   const [reportSuccess, setReportSuccess] = useState(false);
 
+  // Dual-Layer Anti-Scam Paywall States
+  const [isPaywallLocked, setIsPaywallLocked] = useState(false);
+  const [paywallTab, setPaywallTab] = useState<"preview" | "payload">("preview");
+  const [publicPreview, setPublicPreview] = useState("");
+  const [secretPayload, setSecretPayload] = useState("");
+  const [unlockPriceGold, setUnlockPriceGold] = useState(2);
+  const [unlockPricePoints, setUnlockPricePoints] = useState(50);
+
+  // Unlocked post secrets cache
+  const [unlockedSecrets, setUnlockedSecrets] = useState<Record<string, { secret_content: string; attachments?: any[] }>>({});
+  const [unlockingPostId, setUnlockingPostId] = useState<string | null>(null);
+
+  // Quote Selection
+  const [selectedQuote, setSelectedQuote] = useState<{ postId: string; text: string } | null>(null);
+
   // Initialize identity
   useEffect(() => {
     const ident = getOrCreateAnonymousIdentity();
@@ -265,12 +293,19 @@ export function SocialFeedClient({
     if (activeTab === "all" && !searchQuery.trim()) {
       const userProfile = getUserInterestProfile();
       result.sort((a, b) => {
+        const ageHoursA = Math.max(0, (Date.now() - new Date(a.created_at).getTime()) / 3600000);
+        const ageHoursB = Math.max(0, (Date.now() - new Date(b.created_at).getTime()) / 3600000);
+        const recencyScoreA = Math.max(0, 50 - ageHoursA * 2);
+        const recencyScoreB = Math.max(0, 50 - ageHoursB * 2);
+
         const scoreA =
+          recencyScoreA +
           calculatePostAffinity(a, userProfile) +
           (a.upvotes_count || 0) * 2 -
           (a.downvotes_count || 0) +
           (a.views_count || 0) * 0.1;
         const scoreB =
+          recencyScoreB +
           calculatePostAffinity(b, userProfile) +
           (b.upvotes_count || 0) * 2 -
           (b.downvotes_count || 0) +
@@ -318,10 +353,17 @@ export function SocialFeedClient({
     e.preventDefault();
     setModerationWarning(null);
 
-    if (!postContent.trim() && uploadedMedia.length === 0) return;
+    const mainContent = isPaywallLocked ? (publicPreview.trim() || postContent.trim()) : postContent.trim();
+
+    if (!mainContent && uploadedMedia.length === 0) return;
+
+    if (isPaywallLocked && !secretPayload.trim()) {
+      setModerationWarning("Vui lòng nhập nội dung bí mật (Secret Payload) cần bảo vệ bằng Paywall.");
+      return;
+    }
 
     // Automated Moderation Filter
-    const modResult = inspectContent(postContent);
+    const modResult = inspectContent(mainContent);
     if (!modResult.isAllowed) {
       setModerationWarning(modResult.userMessage || "Nội dung vi phạm tiêu chuẩn cộng đồng Myso.");
       return;
@@ -337,8 +379,8 @@ export function SocialFeedClient({
 
     const postStatus = isDraft ? "draft" : isScheduling && scheduledDateTime ? "scheduled" : "published";
 
-    const payload = {
-      content: postContent.trim(),
+    const payload: Record<string, any> = {
+      content: mainContent,
       author_name: authorName,
       author_handle: authorHandle,
       author_avatar: authorAvatar,
@@ -351,6 +393,11 @@ export function SocialFeedClient({
       community_id: selectedCommunity,
       flair: selectedFlair,
       custom_icon: selectedIcon,
+      is_locked: isPaywallLocked,
+      public_preview: isPaywallLocked ? (publicPreview.trim() || mainContent) : null,
+      secret_content: isPaywallLocked ? secretPayload.trim() : null,
+      unlock_price_gold: isPaywallLocked ? Number(unlockPriceGold) || 0 : 0,
+      unlock_price_points: isPaywallLocked ? Number(unlockPricePoints) || 0 : 0,
     };
 
     try {
@@ -367,6 +414,9 @@ export function SocialFeedClient({
             setPosts((prev) => [data.post, ...prev]);
           }
           setPostContent("");
+          setPublicPreview("");
+          setSecretPayload("");
+          setIsPaywallLocked(false);
           setUploadedMedia([]);
           setSelectedIcon(null);
           setSelectedFlair(null);
@@ -390,6 +440,103 @@ export function SocialFeedClient({
       console.error("Create post error:", err);
     } finally {
       setPosting(false);
+    }
+  };
+
+  // Unlock post handler
+  const handleUnlockPost = async (postId: string, method: "gold" | "points") => {
+    if (!user) {
+      alert("Vui lòng đăng nhập để mở khóa nội dung này.");
+      return;
+    }
+    setUnlockingPostId(postId);
+    try {
+      const res = await fetch(`/api/social/posts/${postId}/unlock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ method }),
+      });
+      const data = await res.json();
+      if (res.ok && data.secret_content !== undefined) {
+        setUnlockedSecrets((prev) => ({
+          ...prev,
+          [postId]: {
+            secret_content: data.secret_content,
+            attachments: data.attachments || [],
+          },
+        }));
+        await refreshProfile();
+      } else {
+        alert(data.error || "Mở khóa thất bại.");
+      }
+    } catch (err: any) {
+      alert(err.message || "Lỗi khi mở khóa bài viết.");
+    } finally {
+      setUnlockingPostId(null);
+    }
+  };
+
+  // Fetch secret if user is author or has already unlocked
+  const handleFetchSecret = async (postId: string) => {
+    try {
+      const res = await fetch(`/api/social/posts/${postId}/secret`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.unlocked && data.secret_content) {
+          setUnlockedSecrets((prev) => ({
+            ...prev,
+            [postId]: {
+              secret_content: data.secret_content,
+              attachments: data.attachments || [],
+            },
+          }));
+        }
+      }
+    } catch (err) {}
+  };
+
+  // Quote selection
+  const handleTextSelection = (postId: string) => {
+    const selection = window.getSelection();
+    const text = selection?.toString().trim();
+    if (text && text.length > 3) {
+      setSelectedQuote({ postId, text });
+    }
+  };
+
+  const applyQuote = (postId: string) => {
+    if (!selectedQuote || selectedQuote.postId !== postId) return;
+    const quoteText = `> ${selectedQuote.text}\n\n`;
+    setCommentInputs((prev) => ({
+      ...prev,
+      [postId]: `${quoteText}${prev[postId] || ""}`,
+    }));
+    setSelectedQuote(null);
+    setExpandedPostComments((prev) => ({ ...prev, [postId]: true }));
+  };
+
+  // Comment Upvote / Downvote
+  const handleVoteComment = async (commentId: string, voteType: number) => {
+    try {
+      const res = await fetch(`/api/social/comments/${commentId}/vote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vote_type: voteType }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCommentsMap((prev) => {
+          const next = { ...prev };
+          for (const pid in next) {
+            next[pid] = next[pid].map((c) =>
+              c.id === commentId ? { ...c, upvotes_count: data.upvotes_count } : c
+            );
+          }
+          return next;
+        });
+      }
+    } catch (err) {
+      console.error("Comment vote error:", err);
     }
   };
 
@@ -630,7 +777,7 @@ export function SocialFeedClient({
   };
 
   return (
-    <div className="container-page py-4 sm:py-6 max-w-7xl">
+    <div className="w-full flex flex-col gap-4 p-3 sm:p-5">
       {/* Hidden file inputs */}
       <input
         type="file"
@@ -648,148 +795,50 @@ export function SocialFeedClient({
         onChange={(e) => handleFileUpload(e, true)}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-5 lg:gap-6 items-start">
-        {/* Left Navigation Bar (Desktop: 3 cols) */}
-        <nav className="hidden xl:block xl:col-span-3 sticky top-20 space-y-4">
-          <div className="rounded-3xl border border-line bg-surface p-4 space-y-1.5 shadow-sm">
-            <Link
-              href={localePath(locale, "/")}
-              className="flex items-center gap-3.5 px-4 py-3 rounded-2xl bg-accent text-white dark:text-[#04101F] font-bold text-sm shadow-sm"
+      {/* Center Main Feed Stream */}
+      <div className="space-y-4">
+        {/* Search Bar */}
+        <div className="relative">
+          <Search className="absolute left-3.5 top-3 h-4 w-4 text-[#71717A]" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Tìm kiếm bài viết, #hashtag, tác giả..."
+            className="w-full rounded-2xl border border-[#27272A] bg-[#121215] pl-10 pr-9 py-2.5 text-xs sm:text-sm text-[#FAFAFA] placeholder-[#71717A] focus:outline-none focus:border-amber-500/50 shadow-sm transition"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-2.5 p-1 rounded-lg text-[#71717A] hover:text-[#FAFAFA]"
             >
-              <Flame className="h-5 w-5" />
-              <span>Bảng Tin Xã Hội</span>
-            </Link>
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
 
-            <Link
-              href={localePath(locale, "/wiki")}
-              className="flex items-center gap-3.5 px-4 py-3 rounded-2xl text-muted hover:text-ink hover:bg-canvas text-sm font-semibold transition"
+        {/* Feed Navigation Tabs (For You, Following, Latest, Popular, Communities) */}
+        <div className="sticky top-0 z-20 rounded-2xl border border-[#27272A] bg-[#121215]/95 backdrop-blur-md p-1.5 flex items-center justify-between gap-1 overflow-x-auto shadow-sm scrollbar-none">
+          {[
+            { id: "all", label: "Tất cả 🔥" },
+            { id: "following", label: "Đang theo dõi 👥" },
+            { id: "latest", label: "Mới nhất ⚡" },
+            { id: "popular", label: "Phổ biến 🏆" },
+            { id: "communities", label: "Chủ đề 🏛️" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition active:scale-95 ${
+                activeTab === tab.id
+                  ? "bg-[#27272A] text-amber-400 border border-[#3F3F46] shadow-xs"
+                  : "text-[#A1A1AA] hover:text-[#FAFAFA] hover:bg-[#18181B]"
+              }`}
             >
-              <Sparkles className="h-5 w-5 text-accent" />
-              <span>Bách Khoa Myso Wiki</span>
-            </Link>
-
-            <Link
-              href={localePath(locale, "/chat")}
-              className="flex items-center gap-3.5 px-4 py-3 rounded-2xl text-muted hover:text-ink hover:bg-canvas text-sm font-semibold transition justify-between"
-            >
-              <div className="flex items-center gap-3.5">
-                <Lock className="h-5 w-5 text-teal" />
-                <span>Chat Mã Hóa (E2EE)</span>
-              </div>
-              <span className="text-[0.62rem] font-mono bg-teal/20 text-teal px-1.5 py-0.5 rounded font-bold">
-                E2EE
-              </span>
-            </Link>
-
-            <Link
-              href={localePath(locale, "/notes")}
-              className="flex items-center gap-3.5 px-4 py-3 rounded-2xl text-muted hover:text-ink hover:bg-canvas text-sm font-semibold transition"
-            >
-              <Hash className="h-5 w-5 text-amber-500" />
-              <span>Ghi Chú Myso Notes</span>
-            </Link>
-
-            <Link
-              href={localePath(locale, "/blog")}
-              className="flex items-center gap-3.5 px-4 py-3 rounded-2xl text-muted hover:text-ink hover:bg-canvas text-sm font-semibold transition"
-            >
-              <TrendingUp className="h-5 w-5 text-purple-400" />
-              <span>Diễn Đàn Thảo Luận</span>
-            </Link>
-
-            <div className="pt-2 border-t border-line">
-              <Link
-                href={localePath(locale, "/legal/standards")}
-                className="flex items-center gap-3.5 px-4 py-2.5 rounded-2xl text-subtle hover:text-ink text-xs font-mono transition"
-              >
-                <ShieldCheck className="h-4 w-4 text-accent" />
-                <span>Tiêu chuẩn & Pháp lý</span>
-              </Link>
-            </div>
-          </div>
-
-          {/* Quick Profile Widget */}
-          <div className="rounded-3xl border border-line bg-surface p-4 shadow-sm">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="h-10 w-10 rounded-full border border-line bg-canvas overflow-hidden flex items-center justify-center shrink-0">
-                {profile?.avatar_url ? (
-                  <img src={profile.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
-                ) : (
-                  <User className="h-5 w-5 text-muted" />
-                )}
-              </div>
-              <div className="min-w-0">
-                <span className="font-display text-xs font-bold text-ink truncate block">
-                  {profile?.full_name || anonIdentity?.displayName || "Thành viên Myso"}
-                </span>
-                <span className="font-mono text-[0.68rem] text-subtle truncate block">
-                  @{profile?.username || anonIdentity?.handle || "user"}
-                </span>
-              </div>
-            </div>
-            {profile ? (
-              <Link
-                href={localePath(locale, `/profile/${profile.username}`)}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-canvas border border-line px-3 py-2 text-xs font-semibold text-ink hover:border-accent transition"
-              >
-                Xem hồ sơ & Quản lý bài viết
-              </Link>
-            ) : (
-              <Link
-                href={localePath(locale, "/login")}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-canvas border border-line px-3 py-2 text-xs font-semibold text-ink hover:border-accent transition"
-              >
-                Tạo tài khoản / Đăng nhập
-              </Link>
-            )}
-          </div>
-        </nav>
-
-        {/* Center Main Feed (Mobile: 12 cols, iPad: 7 cols, Desktop: 6 cols) */}
-        <main className="col-span-1 md:col-span-7 xl:col-span-6 space-y-4">
-          {/* Search Bar */}
-          <div className="relative">
-            <Search className="absolute left-3.5 top-3 h-4 w-4 text-subtle" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm kiếm bài viết, #hashtag, cộng đồng hoặc tác giả..."
-              className="w-full rounded-2xl border border-line bg-surface pl-10 pr-9 py-2.5 text-xs sm:text-sm text-ink placeholder:text-subtle focus:outline-none focus:border-accent shadow-xs transition"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-2.5 p-1 rounded-lg text-muted hover:text-ink"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Feed Navigation Tabs (For You, Following, Latest, Popular, Communities, Wiki) */}
-          <div className="sticky top-16 z-20 rounded-2xl border border-line bg-surface/95 backdrop-blur-md p-1.5 flex items-center justify-between gap-1 overflow-x-auto shadow-xs scrollbar-none">
-            {[
-              { id: "all", label: "Dành cho bạn 🔥" },
-              { id: "following", label: "Đang theo dõi 👥" },
-              { id: "latest", label: "Mới nhất ⚡" },
-              { id: "popular", label: "Phổ biến 🏆" },
-              { id: "communities", label: "Cộng đồng 🏛️" },
-              { id: "wiki", label: "Bách khoa Wiki 📚" },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-3 py-1.5 sm:px-3 sm:py-2 rounded-xl text-xs font-bold whitespace-nowrap transition active:scale-95 ${
-                  activeTab === tab.id
-                    ? "bg-accent text-white dark:text-[#04101F] shadow-xs"
-                    : "text-muted hover:text-ink hover:bg-canvas"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
           {/* Sub-community filter if in Communities tab */}
           {activeTab === "communities" && (
@@ -811,9 +860,9 @@ export function SocialFeedClient({
           )}
 
           {/* WYSIWYG TipTap Post Composer (Priority 0) */}
-          <div className="rounded-3xl border border-line bg-surface p-4 sm:p-5 shadow-sm space-y-3">
+          <div className="rounded-2xl border border-[#27272A] bg-[#121215] text-[#FAFAFA] p-4 sm:p-5 shadow-sm space-y-3">
             <div className="flex items-start gap-3">
-              <div className="h-10 w-10 rounded-full border border-line bg-canvas overflow-hidden flex items-center justify-center shrink-0 mt-1">
+              <div className="h-10 w-10 rounded-full border border-[#27272A] bg-[#18181B] overflow-hidden flex items-center justify-center shrink-0 mt-1">
                 {profile?.avatar_url ? (
                   <img src={profile.avatar_url} alt="My avatar" className="h-full w-full object-cover" />
                 ) : (
@@ -821,12 +870,118 @@ export function SocialFeedClient({
                 )}
               </div>
               <div className="flex-1 min-w-0 space-y-2">
-                {/* Real WYSIWYG TipTap Editor */}
-                <TipTapEditor
-                  value={postContent}
-                  onChange={setPostContent}
-                  locale={locale}
-                />
+                {isPaywallLocked ? (
+                  <div className="p-3.5 rounded-2xl bg-amber-500/5 border border-amber-500/30 flex flex-col gap-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <Lock className="h-4 w-4 text-amber-400" />
+                        <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
+                          Khóa bài viết (Dual-Layer Paywall)
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 rounded-xl bg-canvas p-1 border border-line">
+                        <button
+                          type="button"
+                          onClick={() => setPaywallTab("preview")}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${
+                            paywallTab === "preview"
+                              ? "bg-amber-500/20 text-amber-400"
+                              : "text-muted hover:text-ink"
+                          }`}
+                        >
+                          1. Xem trước ({publicPreview.length}/150 min)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPaywallTab("payload")}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${
+                            paywallTab === "payload"
+                              ? "bg-emerald-500/20 text-emerald-400"
+                              : "text-muted hover:text-ink"
+                          }`}
+                        >
+                          2. Nội dung bí mật (Payload)
+                        </button>
+                      </div>
+                    </div>
+
+                    {paywallTab === "preview" ? (
+                      <div className="flex flex-col gap-1.5">
+                        <p className="text-[11px] text-muted">
+                          Bản xem trước công khai (tối thiểu 150 ký tự): Tóm tắt giải pháp, bằng chứng kết quả hoặc ảnh demo để độc giả tin cậy trước khi mở khóa.
+                        </p>
+                        <textarea
+                          rows={4}
+                          value={publicPreview}
+                          onChange={(e) => setPublicPreview(e.target.value)}
+                          placeholder="Nhập phần xem trước công khai tại đây (>= 150 ký tự)..."
+                          className="w-full p-2.5 rounded-xl bg-canvas border border-line text-xs text-ink placeholder:text-muted focus:outline-none focus:border-amber-500/50"
+                        />
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className={publicPreview.length >= 150 ? "text-emerald-400 font-bold" : "text-amber-400"}>
+                            {publicPreview.length >= 150 ? "✓ Đủ tiêu chuẩn xem trước" : `Còn thiếu ${150 - publicPreview.length} ký tự`}
+                          </span>
+                          <span className="text-muted font-mono">{publicPreview.length} / 150</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-1.5">
+                        <p className="text-[11px] text-muted">
+                          Nội dung bí mật (Payload): Mã nguồn, AI Prompt, tài liệu mật. Sẽ được lưu trữ tách biệt trong bảng post_secrets và chỉ mở khóa cho người trả phí.
+                        </p>
+                        <textarea
+                          rows={5}
+                          value={secretPayload}
+                          onChange={(e) => setSecretPayload(e.target.value)}
+                          placeholder="Nhập code, prompt, link hoặc lời giải bí mật cần bảo vệ..."
+                          className="w-full p-2.5 rounded-xl bg-canvas border border-line font-mono text-xs text-ink placeholder:text-muted focus:outline-none focus:border-emerald-500/50"
+                        />
+                        <div className="flex items-center gap-3 text-[11px] text-emerald-400 font-mono">
+                          <span>{secretPayload.trim().split(/\s+/).filter(Boolean).length} từ</span>
+                          <span>·</span>
+                          <span>{(secretPayload.match(/```[\s\S]*?```/g) || []).length} khối code</span>
+                          <span>·</span>
+                          <span>{(secretPayload.match(/https?:\/\/[^\s]+/g) || []).length} liên kết</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Pricing settings */}
+                    <div className="pt-2 border-t border-line/70 flex flex-wrap items-center gap-4 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="text-amber-400 font-bold">💰 Giá Myso Gold:</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.5"
+                          value={unlockPriceGold}
+                          onChange={(e) => setUnlockPriceGold(Number(e.target.value))}
+                          className="w-16 p-1 rounded-lg bg-canvas border border-line text-xs text-center font-bold text-amber-400 focus:outline-none"
+                        />
+                        <span className="text-[10px] text-muted">(1 Gold = 1 USDT)</span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-emerald-400 font-bold">🪙 Giá Myso Points:</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="10"
+                          value={unlockPricePoints}
+                          onChange={(e) => setUnlockPricePoints(Number(e.target.value))}
+                          className="w-16 p-1 rounded-lg bg-canvas border border-line text-xs text-center font-bold text-emerald-400 focus:outline-none"
+                        />
+                        <span className="text-[10px] text-muted">(Điểm miễn phí)</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <TipTapEditor
+                    value={postContent}
+                    onChange={setPostContent}
+                    locale={locale}
+                  />
+                )}
               </div>
             </div>
 
@@ -1010,6 +1165,19 @@ export function SocialFeedClient({
                   <Clock className="h-4 w-4 text-purple-400" />
                   <span className="hidden sm:inline">Lên lịch</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsPaywallLocked(!isPaywallLocked)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition active:scale-95 ${
+                    isPaywallLocked
+                      ? "border-amber-500 bg-amber-500/20 text-amber-400 shadow-sm shadow-amber-500/10"
+                      : "border-line bg-canvas text-ink hover:border-accent"
+                  }`}
+                >
+                  <Lock className="h-3.5 w-3.5 text-amber-400" />
+                  <span>{isPaywallLocked ? "Paywall: BẬT 🔒" : "Khóa Paywall"}</span>
+                </button>
               </div>
 
               <div className="flex items-center gap-2">
@@ -1112,13 +1280,13 @@ export function SocialFeedClient({
                   return (
                     <article
                       key={post.id}
-                      className="card p-4 sm:p-5 border border-line bg-surface shadow-xs hover:border-line/90 rounded-2xl transition space-y-3"
+                      className="p-4 sm:p-5 rounded-2xl border border-[#27272A] bg-[#121215] text-[#FAFAFA] shadow-sm hover:border-[#3F3F46] transition space-y-3"
                     >
                       {/* Author Header */}
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-3">
                           <Link href={localePath(locale, `/u/${post.author_handle}`)} className="shrink-0">
-                            <div className="h-10 w-10 rounded-full border border-line bg-canvas overflow-hidden flex items-center justify-center">
+                            <div className="h-10 w-10 rounded-full border border-[#27272A] bg-[#18181B] overflow-hidden flex items-center justify-center">
                               {post.author_avatar ? (
                                 <img src={post.author_avatar} alt={post.author_name} className="h-full w-full object-cover" />
                               ) : (
@@ -1200,11 +1368,105 @@ export function SocialFeedClient({
                       </div>
 
                       {/* Content Body */}
-                      <div className="pt-1">
-                        <RichContentRenderer
-                          content={isTranslated ? translatedPosts[post.id].text : post.content}
-                        />
+                      <div
+                        className="pt-1 select-text"
+                        onMouseUp={() => handleTextSelection(post.id)}
+                      >
+                        {post.is_locked ? (
+                          unlockedSecrets[post.id] || (user && post.author_id === user.id) ? (
+                            <div className="space-y-3">
+                              {/* Unlocked green badge */}
+                              <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between text-xs">
+                                <span className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                                  <CheckCircle2 className="h-4 w-4" />
+                                  ĐÃ MỞ KHÓA BẢN QUYỀN CHÍNH THỨC
+                                </span>
+                                <span className="text-[10px] text-muted font-mono">Myso Safe-by-Design</span>
+                              </div>
+
+                              {/* Render secret content */}
+                              <div className="p-3.5 rounded-xl bg-[#0D0D10] border border-[#27272A]">
+                                <RichContentRenderer
+                                  content={unlockedSecrets[post.id]?.secret_content || post.content}
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              {/* Public Preview */}
+                              <div className="text-xs text-ink/90 leading-relaxed">
+                                <RichContentRenderer
+                                  content={post.public_preview || post.content}
+                                />
+                              </div>
+
+                              {/* Anti-Scam Verified Metadata Badge */}
+                              <div className="p-3.5 rounded-2xl bg-[#121215] border border-emerald-500/30 flex flex-col gap-2.5">
+                                <div className="flex items-center justify-between">
+                                  <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+                                    <ShieldCheck className="h-4 w-4" />
+                                    Xác thực máy chủ độc lập (Anti-Scam Verified)
+                                  </span>
+                                  <span className="text-[10px] font-mono text-muted">Payload Hash OK</span>
+                                </div>
+
+                                <div className="flex items-center gap-2 text-xs text-[#FAFAFA] font-mono bg-[#18181B] p-2 rounded-xl border border-[#27272A]">
+                                  <span>📝 {post.payload_metadata?.wordsCount || 0} từ</span>
+                                  <span>·</span>
+                                  <span>💻 {post.payload_metadata?.codeBlocksCount || 0} khối code</span>
+                                  <span>·</span>
+                                  <span>📎 {post.payload_metadata?.attachmentsCount || 0} tệp đính kèm</span>
+                                </div>
+
+                                {/* Unlock action buttons */}
+                                <div className="pt-1 flex items-center gap-2">
+                                  <button
+                                    onClick={() => handleUnlockPost(post.id, "gold")}
+                                    disabled={unlockingPostId === post.id}
+                                    className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/10 cursor-pointer disabled:opacity-50"
+                                  >
+                                    <Coins className="h-3.5 w-3.5" />
+                                    <span>
+                                      {unlockingPostId === post.id
+                                        ? "Đang mở khóa..."
+                                        : `Mở khóa bằng Gold (${post.unlock_price_gold || 2} Gold)`}
+                                    </span>
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleUnlockPost(post.id, "points")}
+                                    disabled={unlockingPostId === post.id}
+                                    className="py-2 px-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                                  >
+                                    <Zap className="h-3.5 w-3.5" />
+                                    <span>{post.unlock_price_points || 50} pts</span>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        ) : (
+                          <RichContentRenderer
+                            content={isTranslated ? translatedPosts[post.id].text : post.content}
+                          />
+                        )}
                       </div>
+
+                      {/* Floating Quote Trigger */}
+                      {selectedQuote && selectedQuote.postId === post.id && (
+                        <div className="flex items-center gap-2 p-2 rounded-xl bg-[#18181B] border border-amber-500/40 text-xs text-ink shadow-lg">
+                          <span className="text-[11px] text-muted italic truncate max-w-[200px]">
+                            &ldquo;{selectedQuote.text}&rdquo;
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => applyQuote(post.id)}
+                            className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-[11px] font-bold transition"
+                          >
+                            Trích dẫn
+                          </button>
+                        </div>
+                      )}
 
                       {/* Translation Provider Badge */}
                       {isTranslated && (
@@ -1333,74 +1595,114 @@ export function SocialFeedClient({
                             </button>
                           </div>
 
-                          {/* Comments List with Nested Threaded Replies */}
+                          {/* Comments List with Recursive 4-Tier Threaded Replies */}
                           <div className="space-y-2.5 pt-2">
                             {currentComments
                               .filter((c) => !c.parent_id)
                               .map((rootC) => {
-                                const replies = currentComments.filter((c) => c.parent_id === rootC.id);
-                                return (
-                                  <div key={rootC.id} className="space-y-2">
-                                    {/* Root comment card */}
-                                    <div className="p-3 rounded-xl border border-line/60 bg-canvas space-y-1.5 text-xs">
-                                      <div className="flex items-center justify-between">
-                                        <Link
-                                          href={localePath(locale, `/u/${rootC.author_handle}`)}
-                                          className="flex items-center gap-2 hover:underline"
-                                        >
-                                          <span className="font-bold text-ink hover:text-accent transition">{rootC.author_name}</span>
-                                          <span className="font-mono text-[0.65rem] text-muted">@{rootC.author_handle}</span>
-                                        </Link>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleTranslateComment(rootC.id, rootC.content)}
-                                          className="text-[0.65rem] text-muted hover:text-teal"
-                                        >
-                                          {translatedComments[rootC.id] ? "Xem bản gốc" : "Dịch"}
-                                        </button>
-                                      </div>
+                                const renderNode = (c: SocialCommentItem, depth: number): React.ReactNode => {
+                                  const childReplies = currentComments.filter((item) => item.parent_id === c.id);
+                                  return (
+                                    <div
+                                      key={c.id}
+                                      className={`space-y-1.5 text-xs ${
+                                        depth > 0 ? "pl-3 sm:pl-4 border-l-2 border-[#27272A] mt-2" : "mt-2"
+                                      }`}
+                                    >
+                                      <div className="p-3 rounded-xl border border-line/60 bg-canvas space-y-1.5">
+                                        <div className="flex items-center justify-between">
+                                          <Link
+                                            href={localePath(locale, `/u/${c.author_handle}`)}
+                                            className="flex items-center gap-2 hover:underline"
+                                          >
+                                            <span className="font-bold text-ink hover:text-accent transition">
+                                              {c.author_name}
+                                            </span>
+                                            <span className="font-mono text-[0.65rem] text-muted">
+                                              @{c.author_handle}
+                                            </span>
+                                            {depth > 0 && (
+                                              <span className="text-[9px] px-1 py-0.2 rounded bg-[#18181B] text-[#71717A] border border-[#27272A]">
+                                                L{depth}
+                                              </span>
+                                            )}
+                                          </Link>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleTranslateComment(c.id, c.content)}
+                                            className="text-[0.65rem] text-muted hover:text-teal"
+                                          >
+                                            {translatedComments[c.id] ? "Xem bản gốc" : "Dịch"}
+                                          </button>
+                                        </div>
 
-                                      <p className="text-ink leading-relaxed">
-                                        {translatedComments[rootC.id]?.text || rootC.content}
-                                      </p>
-
-                                      <div className="flex items-center gap-3 pt-1 text-[0.65rem] text-muted font-mono">
-                                        <span>{new Date(rootC.created_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}</span>
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setReplyingToComment((prev) => ({ ...prev, [post.id]: rootC.id }));
-                                            setCommentInputs((prev) => ({ ...prev, [post.id]: `@${rootC.author_handle} ` }));
-                                          }}
-                                          className="hover:text-accent font-semibold flex items-center gap-1"
+                                        <p
+                                          onMouseUp={() => handleTextSelection(post.id)}
+                                          className="text-ink leading-relaxed select-text"
                                         >
-                                          <CornerDownRight className="h-3 w-3" />
-                                          Trả lời
-                                        </button>
-                                      </div>
-                                    </div>
+                                          {translatedComments[c.id]?.text || c.content}
+                                        </p>
 
-                                    {/* Nested Replies */}
-                                    {replies.length > 0 && (
-                                      <div className="pl-6 space-y-2 border-l-2 border-line/60 ml-3">
-                                        {replies.map((rep) => (
-                                          <div key={rep.id} className="p-2.5 rounded-xl border border-line/50 bg-canvas/80 space-y-1 text-xs">
-                                            <div className="flex items-center justify-between">
-                                              <Link
-                                                href={localePath(locale, `/u/${rep.author_handle}`)}
-                                                className="flex items-center gap-1.5 hover:underline"
-                                              >
-                                                <span className="font-bold text-ink hover:text-accent transition">{rep.author_name}</span>
-                                                <span className="font-mono text-[0.65rem] text-muted">@{rep.author_handle}</span>
-                                              </Link>
-                                            </div>
-                                            <p className="text-ink leading-relaxed">{rep.content}</p>
+                                        <div className="flex items-center justify-between pt-1 text-[0.65rem] text-muted font-mono">
+                                          <div className="flex items-center gap-3">
+                                            <span>
+                                              {new Date(c.created_at).toLocaleTimeString("vi-VN", {
+                                                hour: "2-digit",
+                                                minute: "2-digit",
+                                              })}
+                                            </span>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setReplyingToComment((prev) => ({ ...prev, [post.id]: c.id }));
+                                                setCommentInputs((prev) => ({
+                                                  ...prev,
+                                                  [post.id]: `@${c.author_handle} `,
+                                                }));
+                                              }}
+                                              className="hover:text-accent font-semibold flex items-center gap-1 cursor-pointer"
+                                            >
+                                              <CornerDownRight className="h-3 w-3" />
+                                              Trả lời
+                                            </button>
                                           </div>
-                                        ))}
+
+                                          {/* Comment Upvotes */}
+                                          <div className="flex items-center gap-1 bg-[#18181B] px-1.5 py-0.5 rounded-lg border border-[#27272A]">
+                                            <button
+                                              type="button"
+                                              onClick={() => handleVoteComment(c.id, 1)}
+                                              className="hover:text-orange-400 p-0.5"
+                                              title="Upvote comment"
+                                            >
+                                              <ChevronUp className="h-3 w-3" />
+                                            </button>
+                                            <span className="font-bold text-ink px-0.5">
+                                              {c.upvotes_count || 0}
+                                            </span>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleVoteComment(c.id, -1)}
+                                              className="hover:text-blue-400 p-0.5"
+                                              title="Downvote comment"
+                                            >
+                                              <ChevronDown className="h-3 w-3" />
+                                            </button>
+                                          </div>
+                                        </div>
                                       </div>
-                                    )}
-                                  </div>
-                                );
+
+                                      {/* Recursively render child replies up to 4 levels (depth 0, 1, 2, 3) */}
+                                      {childReplies.length > 0 && depth < 3 && (
+                                        <div className="space-y-1.5">
+                                          {childReplies.map((reply) => renderNode(reply, depth + 1))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                };
+
+                                return renderNode(rootC, 0);
                               })}
                           </div>
                         </div>
@@ -1411,60 +1713,7 @@ export function SocialFeedClient({
               )}
             </div>
           )}
-        </main>
-
-        {/* Right Sidebar: Trending Topics & About Myso */}
-        <aside className="hidden md:block md:col-span-5 xl:col-span-3 sticky top-20 space-y-4">
-          {/* Trending Communities */}
-          <div className="rounded-3xl border border-line bg-surface p-4 shadow-sm space-y-3">
-            <h3 className="font-display font-bold text-sm text-ink flex items-center gap-2">
-              <Flame className="h-4 w-4 text-orange-500" />
-              <span>Cộng đồng nổi bật</span>
-            </h3>
-
-            <div className="space-y-2">
-              {COMMUNITIES.slice(1).map((comm) => (
-                <button
-                  key={comm.id}
-                  onClick={() => {
-                    setActiveTab("communities");
-                    setSelectedCommunity(comm.id);
-                  }}
-                  className="flex w-full items-center justify-between p-2.5 rounded-xl border border-line bg-canvas hover:border-accent text-left transition"
-                >
-                  <div className="flex items-center gap-2">
-                    <comm.icon className="h-4 w-4 text-accent" />
-                    <span className="text-xs font-semibold text-ink">{comm.name}</span>
-                  </div>
-                  <span className="text-[0.65rem] font-mono text-muted">Xem</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* About Myso Statement */}
-          <div className="rounded-3xl border border-line bg-surface p-4 shadow-sm text-xs space-y-2">
-            <div className="flex items-center gap-2 text-ink font-bold font-display">
-              <ShieldCheck className="h-4 w-4 text-teal" />
-              <span>Nền Tảng Cộng Đồng Myso</span>
-            </div>
-            <p className="text-muted leading-relaxed">
-              Myso là nền tảng cộng đồng hiện đại, kết hợp khả năng viết bài chuẩn WYSIWYG, thảo luận đa chiều, kiểm duyệt độc lập và bách khoa mở.
-            </p>
-            <div className="pt-2 border-t border-line text-[0.7rem] font-mono text-subtle flex flex-wrap gap-x-3 gap-y-1">
-              <Link href={localePath(locale, "/legal/standards")} className="hover:text-ink">
-                Tiêu chuẩn
-              </Link>
-              <Link href={localePath(locale, "/privacy")} className="hover:text-ink">
-                Bảo mật
-              </Link>
-              <Link href={localePath(locale, "/terms")} className="hover:text-ink">
-                Điều khoản
-              </Link>
-            </div>
-          </div>
-        </aside>
-      </div>
+        </div>
 
       {/* Analytics Modal */}
       {analyticsPost && (

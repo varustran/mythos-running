@@ -9,11 +9,13 @@ import { EarningsCalculator } from "@/components/monetization/EarningsCalculator
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
   if (!isLocale(locale)) return {};
-  const titles = {
+  const titles: Record<string, string> = {
     vi: "Chính Sách Kiếm Tiền Cho Tác Giả — Myso Creator Rewards",
     en: "Creator Monetization Policy — Myso Creator Rewards",
     "zh-CN": "创作者变现政策 — Myso 激励计划",
     ja: "クリエイター収益化ポリシー — Myso クリエイター報酬",
+    fr: "Politique de Rémunération Créateur 85/15 — Myso",
+    de: "85/15 Creator-Umsatzbeteiligung — Myso",
   };
 
   return buildMetadata({

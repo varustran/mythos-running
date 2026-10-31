@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Flame, Sparkles, MessageSquare, StickyNote, User } from "lucide-react";
+import { Flame, Compass, Zap, Wallet, User } from "lucide-react";
 import { localePath, type Locale } from "@/lib/i18n/settings";
 import { useAuth } from "@/components/providers/AuthProvider";
 
@@ -28,22 +28,22 @@ export function MobileBottomBar({ locale }: MobileBottomBarProps) {
       icon: Flame,
     },
     {
-      key: "wiki",
-      label: "Wiki",
-      href: "/wiki",
-      icon: Sparkles,
+      key: "explore",
+      label: "Khám phá",
+      href: "/explore",
+      icon: Compass,
     },
     {
-      key: "chat",
-      label: "Chat",
-      href: "/chat",
-      icon: MessageSquare,
+      key: "quests",
+      label: "Nhiệm vụ",
+      href: "/quests",
+      icon: Zap,
     },
     {
-      key: "notes",
-      label: "Ghi chú",
-      href: "/notes",
-      icon: StickyNote,
+      key: "wallet",
+      label: "Ví & Thưởng",
+      href: "/wallet",
+      icon: Wallet,
     },
     {
       key: "profile",

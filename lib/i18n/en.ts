@@ -100,6 +100,9 @@ export const en: Dictionary = {
   },
   nav: {
     feed: "Feed",
+    explore: "Explore",
+    quests: "Quests",
+    wallet: "Wallet & Revenue",
     chat: "Chat 🔒",
     standards: "Standards & Legal",
     home: "Home",

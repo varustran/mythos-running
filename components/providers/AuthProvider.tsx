@@ -23,6 +23,9 @@ export interface UserProfile {
   topics?: string[];
   followers_count?: number;
   following_count?: number;
+  points_balance?: number;
+  gold_balance?: number;
+  wallet_address?: string | null;
 }
 
 export type AccountStatus =
@@ -77,6 +80,9 @@ export function AuthProvider({
       role: p.role,
       onboarding_completed: p.onboardingCompleted,
       onboarding_step: p.onboardingStep,
+      points_balance: p.pointsBalance ?? 0,
+      gold_balance: p.goldBalance ?? 0,
+      wallet_address: p.walletAddress ?? null,
     };
   });
 
@@ -108,6 +114,9 @@ export function AuthProvider({
               role: p.role,
               onboarding_completed: p.onboardingCompleted,
               onboarding_step: p.onboardingStep,
+              points_balance: p.pointsBalance ?? 0,
+              gold_balance: p.goldBalance ?? 0,
+              wallet_address: p.walletAddress ?? null,
             });
             setStatus(sessionData.status);
             return;
@@ -130,6 +139,9 @@ export function AuthProvider({
                   role: ip.role,
                   onboarding_completed: Boolean(ip.onboarding_completed),
                   onboarding_step: ip.onboarding_step || 1,
+                  points_balance: Number(ip.points_balance || 0),
+                  gold_balance: Number(ip.gold_balance || 0),
+                  wallet_address: ip.wallet_address || null,
                 });
                 setStatus(ip.onboarding_completed ? "profile_complete" : "profile_incomplete");
                 return;
@@ -142,7 +154,7 @@ export function AuthProvider({
         if (supabase) {
           const { data: dbProf } = await supabase
             .from("profiles")
-            .select("id, user_id, email, username, full_name, avatar_url, role, onboarding_completed, onboarding_step")
+            .select("id, user_id, email, username, full_name, avatar_url, role, onboarding_completed, onboarding_step, points_balance, gold_balance, wallet_address")
             .or(`user_id.eq.${authUser.id},id.eq.${authUser.id},email.eq.${authUser.email}`)
             .maybeSingle();
 
@@ -157,6 +169,9 @@ export function AuthProvider({
               role: (dbProf.role as UserRole) || "user",
               onboarding_completed: Boolean(dbProf.onboarding_completed),
               onboarding_step: dbProf.onboarding_step || 1,
+              points_balance: Number(dbProf.points_balance || 0),
+              gold_balance: Number(dbProf.gold_balance || 0),
+              wallet_address: dbProf.wallet_address || null,
             });
             setStatus(dbProf.onboarding_completed ? "profile_complete" : "profile_incomplete");
             return;
@@ -191,6 +206,9 @@ export function AuthProvider({
               role: p.role,
               onboarding_completed: p.onboardingCompleted,
               onboarding_step: p.onboardingStep,
+              points_balance: p.pointsBalance ?? 0,
+              gold_balance: p.goldBalance ?? 0,
+              wallet_address: p.walletAddress ?? null,
             });
             setStatus(sessionData.status);
           }

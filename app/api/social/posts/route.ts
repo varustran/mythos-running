@@ -40,29 +40,8 @@ export async function GET(req: Request) {
 
     let query = supabase.from("social_posts").select("*");
 
-    const isAuthorViewingOwn =
-      currentUserHandle &&
-      authorHandle &&
-      currentUserHandle.toLowerCase() === authorHandle.toLowerCase().replace(/^@/, "");
-
-    if (isAuthorViewingOwn) {
-      // Author can see their own public, unlisted, private posts, and drafts/schedules
+    if (authorHandle) {
       query = query.ilike("author_handle", authorHandle.replace(/^@/, ""));
-      if (!includeDrafts) {
-        query = query.eq("status", "published");
-      }
-    } else {
-      // Public / Other visitors can ONLY EVER see published & public posts!
-      query = query.eq("status", "published").eq("visibility", "public");
-
-      if (authorHandle) {
-        query = query.ilike("author_handle", authorHandle.replace(/^@/, ""));
-      }
-    }
-
-    // Community filter
-    if (communityId && communityId !== "all") {
-      query = query.eq("community_id", communityId);
     }
 
     // Category filter
@@ -70,11 +49,9 @@ export async function GET(req: Request) {
       query = query.eq("category", category);
     }
 
-    // Feed sorting & filtering
+    // Feed sorting
     if (feed === "popular") {
       query = query.order("likes_count", { ascending: false }).order("created_at", { ascending: false });
-    } else if (feed === "wiki") {
-      query = query.eq("post_type", "wiki").order("created_at", { ascending: false });
     } else {
       query = query.order("created_at", { ascending: false });
     }
@@ -112,6 +89,11 @@ export async function POST(req: Request) {
       community_id = "general",
       flair = null,
       poll_data = null,
+      is_locked = false,
+      public_preview = null,
+      unlock_price_gold = 0,
+      unlock_price_points = 0,
+      secret_content = null,
     } = body;
 
     if (!content || !content.trim()) {
@@ -174,13 +156,6 @@ export async function POST(req: Request) {
       author_avatar: author_avatar || null,
       media_urls: Array.isArray(media_urls) ? media_urls : [],
       category: category || "all",
-      visibility: safeVisibility,
-      post_type: safePostType,
-      status: safeStatus,
-      scheduled_at: scheduled_at ? new Date(scheduled_at).toISOString() : null,
-      community_id: community_id || "general",
-      flair: flair || null,
-      poll_data: poll_data || null,
       likes_count: 0,
       reposts_count: 0,
       comments_count: 0,
@@ -188,6 +163,18 @@ export async function POST(req: Request) {
       views_count: 1,
       monetized: isMonetized,
       custom_icon: custom_icon || null,
+      is_locked: Boolean(is_locked),
+      public_preview: is_locked ? (public_preview?.trim() || content.trim()) : null,
+      unlock_price_gold: is_locked ? Math.max(0, Number(unlock_price_gold) || 0) : 0,
+      unlock_price_points: is_locked ? Math.max(0, Number(unlock_price_points) || 0) : 0,
+      payload_metadata: is_locked
+        ? {
+            wordsCount: (secret_content || "").trim().split(/\s+/).filter(Boolean).length,
+            codeBlocksCount: ((secret_content || "").match(/```[\s\S]*?```/g) || []).length,
+            linksCount: ((secret_content || "").match(/https?:\/\/[^\s]+/g) || []).length,
+            attachmentsCount: Array.isArray(media_urls) ? media_urls.length : 0,
+          }
+        : { wordsCount: 0, codeBlocksCount: 0, linksCount: 0, attachmentsCount: 0 },
     };
 
     const { data, error } = await supabase
@@ -199,6 +186,17 @@ export async function POST(req: Request) {
     if (error) {
       console.error("Supabase insert post error:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // If post is locked and secret content is provided, save in isolated post_secrets table
+    if (is_locked && secret_content && secret_content.trim()) {
+      const { error: secErr } = await supabase.from("post_secrets").insert({
+        post_id: data.id,
+        secret_content: secret_content.trim(),
+      });
+      if (secErr) {
+        console.error("post_secrets insert error:", secErr);
+      }
     }
 
     return NextResponse.json({ post: data });

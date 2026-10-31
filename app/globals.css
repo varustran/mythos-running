@@ -21,30 +21,30 @@
 :root {
   --font-sans: "Inter";
   --font-display: "Sora";
-  --canvas: 255 255 255;
-  --surface: 255 255 255;
-  --elevated: 247 249 250;
-  --ink: 15 20 25;
-  --muted: 83 100 113;
-  --subtle: 113 118 123;
-  --line: 239 243 244;
-  --accent: 29 155 240;
-  --accent-soft: 232 245 254;
-  --teal: 0 186 124;
-  color-scheme: light;
+  --canvas: 9 9 11;
+  --surface: 18 18 21;
+  --elevated: 24 24 27;
+  --ink: 250 250 250;
+  --muted: 161 161 170;
+  --subtle: 113 113 122;
+  --line: 39 39 42;
+  --accent: 245 158 11;
+  --accent-soft: 39 39 42;
+  --teal: 16 185 129;
+  color-scheme: dark;
 }
 
 .dark {
-  --canvas: 0 0 0;
-  --surface: 10 10 10;
-  --elevated: 22 24 28;
-  --ink: 247 249 249;
-  --muted: 142 153 163;
-  --subtle: 113 118 123;
-  --line: 47 51 54;
-  --accent: 29 155 240;
-  --accent-soft: 13 41 64;
-  --teal: 0 186 124;
+  --canvas: 9 9 11;
+  --surface: 18 18 21;
+  --elevated: 24 24 27;
+  --ink: 250 250 250;
+  --muted: 161 161 170;
+  --subtle: 113 113 122;
+  --line: 39 39 42;
+  --accent: 245 158 11;
+  --accent-soft: 39 39 42;
+  --teal: 16 185 129;
   color-scheme: dark;
 }
 

@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { defaultLocale, isLocale } from "@/lib/i18n/settings";
 import { updateSession } from "@/lib/supabase/middleware";
 
-const SKIP_PREFIXES = ["/_next", "/api", "/auth", "/fonts", "/brand", "/images"];
+const SKIP_PREFIXES = ["/_next", "/api", "/auth", "/fonts", "/brand", "/images", "/favicon"];
 
 function detectLocale(request: NextRequest) {
   const cookie = request.cookies.get("NEXT_LOCALE")?.value;
@@ -15,10 +15,12 @@ function detectLocale(request: NextRequest) {
     .filter(Boolean);
 
   for (const lang of preferred) {
-    if (lang.startsWith("zh")) return "zh-CN";
-    if (lang.startsWith("ja")) return "ja";
-    if (lang.startsWith("en")) return "en";
     if (lang.startsWith("vi")) return "vi";
+    if (lang.startsWith("en")) return "en";
+    if (lang.startsWith("zh")) return "zh";
+    if (lang.startsWith("ja")) return "ja";
+    if (lang.startsWith("fr")) return "fr";
+    if (lang.startsWith("de")) return "de";
   }
   return defaultLocale;
 }
@@ -41,6 +43,7 @@ export async function middleware(request: NextRequest) {
   const maybeLocale = segments[0];
 
   if (maybeLocale && isLocale(maybeLocale)) {
+    // Normal canonical route
     return updateSession(request);
   }
 

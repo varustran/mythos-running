@@ -99,6 +99,9 @@ export const vi = {
   nav: {
     home: "Trang chủ",
     feed: "Bảng tin",
+    explore: "Khám phá",
+    quests: "Nhiệm vụ",
+    wallet: "Ví & Thưởng",
     chat: "Trò chuyện 🔒",
     standards: "Tiêu chuẩn & Pháp lý",
     wiki: "Myso Wiki",

@@ -1,6 +1,6 @@
 import type { Locale } from "@/lib/i18n/settings";
 
-export type LocalizedText = Record<Locale, string>;
+export type LocalizedText = Record<string, string>;
 
 export type PlayerMovement = "idle" | "jog" | "run" | "sprint" | "jump";
 

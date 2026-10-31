@@ -4,7 +4,7 @@ export type LegalDocKey = "privacy" | "terms" | "editorial-policy" | "disclaimer
 
 type LegalDoc = {
   updatedAt: string;
-  body: Record<Locale, string>;
+  body: Record<string, string>;
 };
 
 export const legalDocs: Record<LegalDocKey, LegalDoc> = {

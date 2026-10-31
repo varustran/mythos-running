@@ -13,7 +13,7 @@ type AboutContent = {
   cta: string;
 };
 
-export const aboutContent: Record<Locale, AboutContent> = {
+export const aboutContent: Record<string, AboutContent> = {
   vi: {
     intro:
       "Myso là một mạng lưới tri thức mở đa lĩnh vực, nền tảng xuất bản tự do có cơ chế kiếm tiền minh bạch, bộ công cụ hữu ích và studio trò chơi trực tuyến. Mục tiêu là xây dựng một siêu cộng đồng tự do, dân chủ và kiểm duyệt độc lập.",

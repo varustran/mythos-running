@@ -99,6 +99,9 @@ export const zhCN: Dictionary = {
   },
   nav: {
     feed: "动态",
+    explore: "探索",
+    quests: "任务中心",
+    wallet: "钱包与收益",
     chat: "加密聊天 🔒",
     standards: "标准与法律",
     home: "首页",

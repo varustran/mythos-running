@@ -74,6 +74,16 @@ export async function POST(req: Request) {
     const handle = author_handle || user?.user_metadata?.username || user?.email?.split("@")[0] || "user";
     const avatar = author_avatar || user?.user_metadata?.avatar_url || null;
 
+    let depth = 0;
+    if (parent_id) {
+      const { data: parentComment } = await supabase
+        .from("social_comments")
+        .select("depth")
+        .eq("id", parent_id)
+        .maybeSingle();
+      depth = Math.min((parentComment?.depth ?? 0) + 1, 3);
+    }
+
     const { data: comment, error } = await supabase
       .from("social_comments")
       .insert({
@@ -83,6 +93,7 @@ export async function POST(req: Request) {
         author_handle: handle.replace(/^@/, ""),
         author_avatar: avatar,
         parent_id: parent_id || null,
+        depth,
         likes_count: 0,
         upvotes_count: 0,
       })

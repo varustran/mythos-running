@@ -11,6 +11,7 @@ import { getAccountSession } from "@/lib/supabase/server";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { MobileBottomBar } from "@/components/layout/MobileBottomBar";
+import { AppShell } from "@/components/layout/AppShell";
 
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
@@ -88,8 +89,8 @@ export default async function LocaleLayout({
   const sessionData = await getAccountSession();
 
   return (
-    <html lang={htmlLang[locale]} suppressHydrationWarning>
-      <body className="pb-16 lg:pb-0">
+    <html lang={htmlLang[locale]} className="dark" suppressHydrationWarning>
+      <body className="pb-16 lg:pb-0 bg-[#09090B] text-[#FAFAFA]">
         <ThemeProvider>
           <I18nProvider locale={locale}>
             <AuthProvider initialSession={sessionData}>
@@ -99,12 +100,16 @@ export default async function LocaleLayout({
               >
                 {t("skipToContent")}
               </a>
-              <div className="flex min-h-screen flex-col">
-                <SiteHeader locale={locale} />
-                <main id="main" className="flex-1">
+              <div className="flex min-h-screen flex-col bg-[#09090B]">
+                <div className="lg:hidden">
+                  <SiteHeader locale={locale} />
+                </div>
+                <AppShell locale={locale}>
                   {children}
-                </main>
-                <SiteFooter locale={locale} />
+                </AppShell>
+                <div className="lg:hidden">
+                  <SiteFooter locale={locale} />
+                </div>
               </div>
               <MobileBottomBar locale={locale} />
             </AuthProvider>
