@@ -70,7 +70,8 @@ export async function middleware(request: NextRequest) {
     pathname === "/robots.txt" ||
     pathname === "/sitemap.xml" ||
     pathname === "/favicon.ico" ||
-    pathname === "/manifest.webmanifest"
+    pathname === "/manifest.webmanifest" ||
+    /\.(ico|svg|png|jpg|jpeg|webp|gif|woff2?|ttf|eot)$/i.test(pathname)
   ) {
     return NextResponse.next();
   }
