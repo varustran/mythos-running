@@ -41,13 +41,19 @@ export function getUserInterestProfile(): UserInterestProfile {
   return initial;
 }
 
-export function trackUserInteraction(category?: string, tags: string[] = [], action: "view" | "like" | "comment" | "search" = "view") {
+export function trackUserInteraction(
+  category?: string,
+  tags: string[] = [],
+  action: "view" | "like" | "comment" | "search" | "bookmark" | "repost" = "view"
+) {
   if (typeof window === "undefined") return;
 
-  const weights = {
+  const weights: Record<string, number> = {
     view: 1,
     search: 2,
     like: 3,
+    bookmark: 4,
+    repost: 4,
     comment: 5,
   };
 

@@ -6,7 +6,7 @@ const ROOT_ADMIN_EMAIL = "chuitv1907@gmail.com";
 
 export async function POST(req: Request) {
   try {
-    const { user_id, email, username, verify_status, requester_email } = await req.json();
+    const { user_id, email, username, verify_status } = await req.json();
 
     const cookieStore = await cookies();
     const supabase = createServerClient(
@@ -20,24 +20,16 @@ export async function POST(req: Request) {
       }
     );
 
-    // Verify root admin authorization
-    // In production, we verify either by session or by explicit verification check
+    // Verify root admin authorization via genuine authenticated session
     const {
       data: { user: sessionUser },
     } = await supabase.auth.getUser();
 
-    const currentEmail = sessionUser?.email || requester_email;
-
-    if (currentEmail !== ROOT_ADMIN_EMAIL) {
-      return NextResponse.json(
-        {
-          error: "Truy cập bị từ chối: Chỉ tài khoản Quản trị viên tối cao (chuitv1907@gmail.com) mới có quyền cấp tích xanh xác thực.",
-        },
-        { status: 403 }
-      );
+    if (!sessionUser || sessionUser.email?.toLowerCase() !== ROOT_ADMIN_EMAIL) {
+      return NextResponse.json({ error: "404 Not Found" }, { status: 404 });
     }
 
-    // Update verified badge
+    // Update verified badge in public.profiles
     let query = supabase.from("profiles").update({ verified: !!verify_status });
 
     if (user_id) {
@@ -62,6 +54,6 @@ export async function POST(req: Request) {
       updated: data,
     });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Admin authorization failure" }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

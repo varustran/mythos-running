@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, LogIn, ShieldCheck } from "lucide-react";
+import { Search, LogIn, User } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Logo } from "@/components/brand/Logo";
 import { navItems } from "@/lib/site";
@@ -34,9 +34,9 @@ export function SiteHeader({ locale, role }: { locale: Locale; role?: string | n
     <>
       <header className="sticky top-0 z-50 border-b border-line/70 bg-canvas/85 backdrop-blur-xl">
         <div className="container-page flex h-16 items-center justify-between gap-4">
-          <div className="flex items-center gap-8">
+          <div className="flex items-center gap-6 xl:gap-8">
             <Logo href={localePath(locale)} />
-            <nav className="hidden items-center gap-5 lg:flex" aria-label="Main">
+            <nav className="hidden items-center gap-4 xl:gap-6 lg:flex" aria-label="Main">
               {navItems.map((item) => {
                 const href = localePath(locale, item.href);
                 const active = pathname === href || pathname.startsWith(`${href}/`);
@@ -46,7 +46,7 @@ export function SiteHeader({ locale, role }: { locale: Locale; role?: string | n
                     href={href}
                     className={cn(
                       "relative py-1 text-[0.82rem] font-medium transition",
-                      active ? "text-ink" : "text-muted hover:text-ink",
+                      active ? "text-ink font-semibold" : "text-muted hover:text-ink"
                     )}
                   >
                     {t(`nav:${item.key}`)}
@@ -64,7 +64,7 @@ export function SiteHeader({ locale, role }: { locale: Locale; role?: string | n
               type="button"
               onClick={() => setSearchOpen(true)}
               aria-label={t("common:search")}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface text-muted transition hover:border-accent/60 hover:text-ink"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-surface text-muted transition hover:border-accent/60 hover:text-ink"
             >
               <Search className="h-4 w-4" />
             </button>
@@ -75,11 +75,11 @@ export function SiteHeader({ locale, role }: { locale: Locale; role?: string | n
               <LanguageSwitcher locale={locale} compact />
             </div>
             <Link
-              href={localePath(locale, role ? "/admin" : "/login")}
-              className="hidden h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3.5 text-xs font-medium text-ink transition hover:border-accent/60 hover:text-accent md:inline-flex"
+              href={localePath(locale, "/login")}
+              className="hidden h-9 items-center gap-1.5 rounded-xl border border-line bg-surface px-3.5 text-xs font-semibold text-ink transition hover:border-accent/60 hover:text-accent md:inline-flex"
             >
-              {role ? <ShieldCheck className="h-3.5 w-3.5" /> : <LogIn className="h-3.5 w-3.5" />}
-              {role ? t("nav:admin") : t("nav:login")}
+              <LogIn className="h-3.5 w-3.5 text-accent" />
+              <span>Đăng Nhập</span>
             </Link>
             <MobileNav locale={locale} role={role} />
           </div>

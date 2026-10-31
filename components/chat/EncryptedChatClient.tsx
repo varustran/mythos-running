@@ -7,21 +7,21 @@ import {
   Shield,
   Image as ImageIcon,
   CheckCheck,
-  Search,
-  Sparkles,
-  AlertCircle,
   Paperclip,
-  Smile,
-  FileText,
   UserPlus,
   UserCheck,
   ShieldAlert,
   Inbox,
   Users,
+  ArrowLeft,
+  X,
+  Loader2,
+  FileText,
 } from "lucide-react";
 import type { Locale } from "@/lib/i18n/settings";
 import Link from "next/link";
 import { localePath } from "@/lib/i18n/settings";
+import { uploadMediaFile } from "@/lib/storage";
 
 interface ChatMessage {
   id: string;
@@ -46,15 +46,17 @@ interface ChatContact {
 export function EncryptedChatClient({ locale }: { locale: Locale }) {
   const [activeTab, setActiveTab] = useState<"friends" | "requests">("friends");
   const [activeContact, setActiveContact] = useState<string>("alextran");
+  const [mobileChatOpen, setMobileChatOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
-  const [showImageInput, setShowImageInput] = useState(false);
+  const [chatAttachment, setChatAttachment] = useState<{ url: string; name: string; type: string } | null>(null);
+  const [isUploadingChatFile, setIsUploadingChatFile] = useState(false);
   const [sending, setSending] = useState(false);
   const [friendshipStatus, setFriendshipStatus] = useState<"friends" | "pending" | "stranger">("friends");
   const [newFriendHandle, setNewFriendHandle] = useState("");
   const [showAddFriend, setShowAddFriend] = useState(false);
   const [friendActionMsg, setFriendActionMsg] = useState<string | null>(null);
+  const chatFileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [contacts, setContacts] = useState<ChatContact[]>([
@@ -63,7 +65,7 @@ export function EncryptedChatClient({ locale }: { locale: Locale }) {
       name: "Alex Trần",
       avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
       online: true,
-      lastMessage: "Kiến trúc AI Agent đã tối ưu hóa xong rồi bạn nhé!",
+      lastMessage: "Kiến trúc hệ thống AI Agent đã hoàn tất!",
       time: "10:45",
       isFriend: true,
     },
@@ -72,7 +74,7 @@ export function EncryptedChatClient({ locale }: { locale: Locale }) {
       name: "Hoàng Minh",
       avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
       online: true,
-      lastMessage: "Bạn xem qua bài viết mới về biohacking chưa?",
+      lastMessage: "Bạn xem qua ý tưởng về không gian mở chưa?",
       time: "Hôm qua",
       isFriend: true,
     },
@@ -99,110 +101,113 @@ export function EncryptedChatClient({ locale }: { locale: Locale }) {
       name: "Kỹ sư Crypto Ẩn Danh",
       avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
       online: false,
-      lastMessage: "Chào bạn, mình muốn trao đổi về dự án mở rộng cộng đồng...",
-      time: "15:20",
+      lastMessage: "Chào bạn, tôi muốn trao đổi về giải pháp phân tán.",
+      time: "14:20",
       isFriend: false,
     },
   ]);
 
-  // Check relationship status when activeContact changes
+  // Load chat history
   useEffect(() => {
-    const contact = contacts.find((c) => c.handle === activeContact);
-    if (contact) {
-      setFriendshipStatus(contact.isFriend ? "friends" : "stranger");
-    }
-  }, [activeContact, contacts]);
-
-  // Load chat messages
-  useEffect(() => {
-    async function loadMessages() {
+    async function loadChat() {
       try {
-        const res = await fetch(`/api/chat?user1=me&user2=${activeContact}`);
+        const res = await fetch(`/api/chat?contact=${activeContact}`);
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data.messages) && data.messages.length > 0) {
             setMessages(data.messages);
-            return;
+          } else {
+            setMessages([
+              {
+                id: "initial-1",
+                sender_handle: activeContact,
+                sender_name: contacts.find((c) => c.handle === activeContact)?.name || activeContact,
+                recipient_handle: "me",
+                encrypted_content:
+                  activeContact === "myso_support"
+                    ? "Chào mừng bạn đến với kênh trò chuyện bảo mật Myso. Mọi tin nhắn tại đây đều được mã hóa."
+                    : `Xin chào! Tôi là @${activeContact}. Rất vui được kết nối trên Myso.`,
+                created_at: new Date(Date.now() - 3600000).toISOString(),
+              },
+            ]);
           }
         }
-      } catch {}
-
-      // Default initial encrypted conversation
-      setMessages([
-        {
-          id: "m-1",
-          sender_handle: activeContact,
-          sender_name: contacts.find((c) => c.handle === activeContact)?.name || "Người dùng",
-          recipient_handle: "me",
-          encrypted_content: "Chào bạn! Đây là kênh trò chuyện bảo mật được mã hóa đầu cuối trên Myso.",
-          created_at: new Date(Date.now() - 3600000).toISOString(),
-        },
-        {
-          id: "m-2",
-          sender_handle: "me",
-          sender_name: "Bạn",
-          recipient_handle: activeContact,
-          encrypted_content: "Tuyệt vời, tin nhắn mã hóa không lưu bản rõ trên máy chủ trung gian đúng không?",
-          created_at: new Date(Date.now() - 1800000).toISOString(),
-        },
-        {
-          id: "m-3",
-          sender_handle: activeContact,
-          sender_name: contacts.find((c) => c.handle === activeContact)?.name || "Người dùng",
-          recipient_handle: "me",
-          encrypted_content: "Chính xác, bảo vệ tối đa quyền riêng tư cá nhân và tuân thủ các quy định pháp luật hiện hành.",
-          created_at: new Date(Date.now() - 600000).toISOString(),
-        },
-      ]);
+      } catch (err) {
+        console.error("Load chat error:", err);
+      }
     }
 
-    loadMessages();
+    loadChat();
+
+    // Check relationship status
+    const current = contacts.find((c) => c.handle === activeContact);
+    if (current && !current.isFriend) {
+      setFriendshipStatus("stranger");
+    } else {
+      setFriendshipStatus("friends");
+    }
   }, [activeContact]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Handle direct file upload from PC/phone
+  const handleChatFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingChatFile(true);
+    try {
+      const item = await uploadMediaFile(file, "chat");
+      setChatAttachment(item);
+    } catch (err: any) {
+      alert(`Lỗi tải tệp tin: ${err.message || "Vui lòng thử lại"}`);
+    } finally {
+      setIsUploadingChatFile(false);
+      e.target.value = "";
+    }
+  };
+
+  // Send message
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim() && !imageUrl.trim()) return;
+    if (!inputText.trim() && !chatAttachment) return;
 
     setSending(true);
-    const newMsg: ChatMessage = {
-      id: `msg-${Date.now()}`,
+    const optimisticMessage: ChatMessage = {
+      id: `m-${Date.now()}`,
       sender_handle: "me",
       sender_name: "Bạn",
       recipient_handle: activeContact,
-      encrypted_content: inputText.trim() || "Đã gửi một hình ảnh",
-      media_url: imageUrl.trim() || undefined,
+      encrypted_content: inputText.trim(),
+      media_url: chatAttachment?.url || null,
       created_at: new Date().toISOString(),
     };
 
-    setMessages((prev) => [...prev, newMsg]);
+    setMessages((prev) => [...prev, optimisticMessage]);
     setInputText("");
-    setImageUrl("");
-    setShowImageInput(false);
+    const sentAttachment = chatAttachment;
+    setChatAttachment(null);
 
     try {
       await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sender_handle: "me",
-          sender_name: "Bạn",
           recipient_handle: activeContact,
-          encrypted_content: newMsg.encrypted_content,
-          media_url: newMsg.media_url,
+          content: optimisticMessage.encrypted_content,
+          media_url: sentAttachment?.url,
         }),
       });
     } catch (err) {
-      console.error("Send chat error:", err);
+      console.error("Send message error:", err);
     } finally {
       setSending(false);
     }
   };
 
-  // Handle Accept Message Request / Friend
+  // Accept stranger
   const handleAcceptStranger = async () => {
     try {
       await fetch("/api/social/relationship", {
@@ -211,20 +216,20 @@ export function EncryptedChatClient({ locale }: { locale: Locale }) {
         body: JSON.stringify({
           user_handle: "me",
           target_handle: activeContact,
-          action: "accept_friend",
+          action: "accept",
         }),
       });
 
-      setFriendshipStatus("friends");
       setContacts((prev) =>
         prev.map((c) => (c.handle === activeContact ? { ...c, isFriend: true } : c))
       );
-      setFriendActionMsg("Đã chấp nhận kết bạn! Cuộc trò chuyện chuyển vào danh sách Bạn Bè.");
+      setFriendshipStatus("friends");
+      setFriendActionMsg("Đã kết bạn thành công! Tin nhắn đã được chuyển sang danh sách bạn bè.");
       setTimeout(() => setFriendActionMsg(null), 3000);
     } catch {}
   };
 
-  // Handle Block
+  // Block stranger
   const handleBlockStranger = async () => {
     try {
       await fetch("/api/social/relationship", {
@@ -266,6 +271,7 @@ export function EncryptedChatClient({ locale }: { locale: Locale }) {
     setActiveContact(clean);
     setNewFriendHandle("");
     setShowAddFriend(false);
+    setMobileChatOpen(true);
   };
 
   const filteredContacts = contacts.filter((c) =>
@@ -275,10 +281,23 @@ export function EncryptedChatClient({ locale }: { locale: Locale }) {
   const currentContact = contacts.find((c) => c.handle === activeContact) || contacts[0];
 
   return (
-    <div className="container-page py-6 sm:py-8 max-w-6xl">
-      <div className="grid grid-cols-1 md:grid-cols-12 rounded-3xl border border-line bg-surface overflow-hidden shadow-2xl h-[750px]">
-        {/* Left Contacts Sidebar (4 cols) */}
-        <div className="md:col-span-4 border-r border-line flex flex-col bg-canvas/40">
+    <div className="container-page py-4 sm:py-8 max-w-6xl">
+      {/* Hidden file input for attachments */}
+      <input
+        type="file"
+        ref={chatFileInputRef}
+        className="hidden"
+        accept="image/*,video/*,.pdf,.doc,.zip"
+        onChange={handleChatFileSelected}
+      />
+
+      <div className="grid grid-cols-1 md:grid-cols-12 rounded-3xl border border-line bg-surface overflow-hidden shadow-2xl h-[720px] sm:h-[750px]">
+        {/* Left Contacts Sidebar (Mobile: toggles, Desktop: 4 cols) */}
+        <div
+          className={`${
+            mobileChatOpen ? "hidden md:flex" : "flex"
+          } md:col-span-4 border-r border-line flex-col bg-canvas/40 h-full`}
+        >
           {/* Header */}
           <div className="p-4 border-b border-line flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -289,10 +308,10 @@ export function EncryptedChatClient({ locale }: { locale: Locale }) {
             </div>
             <button
               onClick={() => setShowAddFriend(!showAddFriend)}
-              className="grid h-7 w-7 place-items-center rounded-lg border border-line hover:border-accent text-muted hover:text-ink transition"
+              className="grid h-8 w-8 place-items-center rounded-xl border border-line hover:border-accent text-muted hover:text-ink transition active:scale-95"
               title="Thêm bạn mới"
             >
-              <UserPlus className="h-3.5 w-3.5" />
+              <UserPlus className="h-4 w-4" />
             </button>
           </div>
 
@@ -308,7 +327,7 @@ export function EncryptedChatClient({ locale }: { locale: Locale }) {
               />
               <button
                 type="submit"
-                className="px-3 py-1.5 rounded-xl bg-accent text-white dark:text-[#04101F] text-xs font-semibold"
+                className="px-3 py-1.5 rounded-xl bg-accent text-white dark:text-[#04101F] text-xs font-semibold active:scale-95"
               >
                 Thêm
               </button>
@@ -351,7 +370,10 @@ export function EncryptedChatClient({ locale }: { locale: Locale }) {
               filteredContacts.map((contact) => (
                 <button
                   key={contact.handle}
-                  onClick={() => setActiveContact(contact.handle)}
+                  onClick={() => {
+                    setActiveContact(contact.handle);
+                    setMobileChatOpen(true);
+                  }}
                   className={`w-full p-3.5 flex items-center gap-3 text-left transition ${
                     activeContact === contact.handle ? "bg-accent/10 border-l-4 border-accent" : "hover:bg-canvas"
                   }`}
@@ -393,24 +415,38 @@ export function EncryptedChatClient({ locale }: { locale: Locale }) {
           </div>
         </div>
 
-        {/* Right Active Conversation Stream (8 cols) */}
-        <div className="md:col-span-8 flex flex-col h-full bg-canvas/20">
+        {/* Right Active Conversation Stream (Mobile: toggles, Desktop: 8 cols) */}
+        <div
+          className={`${
+            !mobileChatOpen ? "hidden md:flex" : "flex"
+          } md:col-span-8 flex-col h-full bg-canvas/20`}
+        >
           {/* Header */}
-          <div className="p-4 border-b border-line bg-surface flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="p-3 sm:p-4 border-b border-line bg-surface flex items-center justify-between">
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              {/* Mobile Back Button */}
+              <button
+                type="button"
+                onClick={() => setMobileChatOpen(false)}
+                className="md:hidden p-1.5 rounded-lg border border-line bg-canvas text-ink"
+                title="Quay lại danh sách"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+
               <img
                 src={currentContact.avatar}
                 alt={currentContact.name}
-                className="h-10 w-10 rounded-full object-cover border border-line"
+                className="h-9 w-9 sm:h-10 sm:w-10 rounded-full object-cover border border-line"
               />
               <div>
                 <div className="flex items-center gap-1.5">
-                  <h3 className="font-display text-sm font-bold text-ink">{currentContact.name}</h3>
-                  <span className="font-mono text-xs text-muted">@{currentContact.handle}</span>
+                  <h3 className="font-display text-xs sm:text-sm font-bold text-ink">{currentContact.name}</h3>
+                  <span className="font-mono text-[0.68rem] sm:text-xs text-muted">@{currentContact.handle}</span>
                 </div>
-                <div className="flex items-center gap-1.5 text-[0.68rem] text-teal font-mono">
+                <div className="flex items-center gap-1 text-[0.65rem] text-teal font-mono">
                   <Lock className="h-3 w-3" />
-                  <span>Kênh mã hóa đầu cuối (End-to-End Encrypted)</span>
+                  <span>Mã hóa E2EE</span>
                 </div>
               </div>
             </div>
@@ -420,11 +456,11 @@ export function EncryptedChatClient({ locale }: { locale: Locale }) {
               className="inline-flex items-center gap-1 text-[0.68rem] font-mono text-muted hover:text-ink border border-line rounded-lg px-2.5 py-1"
             >
               <FileText className="h-3 w-3" />
-              <span>Tiêu chuẩn</span>
+              <span className="hidden sm:inline">Tiêu chuẩn</span>
             </Link>
           </div>
 
-          {/* Stranger Banner (Tin nhắn chờ cảnh báo) */}
+          {/* Stranger Banner */}
           {friendshipStatus !== "friends" && (
             <div className="p-3.5 bg-amber-500/10 border-b border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-amber-300">
               <div className="flex items-center gap-2">
@@ -482,7 +518,11 @@ export function EncryptedChatClient({ locale }: { locale: Locale }) {
                   >
                     {msg.media_url && (
                       <div className="mb-2 rounded-xl overflow-hidden border border-black/10">
-                        <img src={msg.media_url} alt="Attachment" className="max-h-60 w-full object-cover" />
+                        {/\.(mp4|webm|mov)$/i.test(msg.media_url) ? (
+                          <video controls src={msg.media_url} className="max-h-60 w-full object-cover" />
+                        ) : (
+                          <img src={msg.media_url} alt="Attachment" className="max-h-60 w-full object-cover" />
+                        )}
                       </div>
                     )}
                     <p className="whitespace-pre-wrap">{msg.encrypted_content}</p>
@@ -501,24 +541,27 @@ export function EncryptedChatClient({ locale }: { locale: Locale }) {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Image URL Pop-in */}
-          {showImageInput && (
-            <div className="p-3 border-t border-line bg-surface/90 flex items-center gap-2">
-              <ImageIcon className="h-4 w-4 text-accent" />
-              <input
-                type="url"
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="Dán URL hình ảnh đính kèm (https://...)..."
-                className="flex-1 rounded-xl border border-line bg-canvas px-3 py-1.5 text-xs text-ink placeholder:text-subtle focus:outline-none focus:border-accent"
-              />
+          {/* Attached Media Preview */}
+          {chatAttachment && (
+            <div className="p-2.5 mx-3 mb-2 rounded-xl border border-line bg-surface flex items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <Paperclip className="h-4 w-4 text-accent shrink-0" />
+                <span className="font-mono text-ink truncate">{chatAttachment.name}</span>
+              </div>
               <button
                 type="button"
-                onClick={() => setShowImageInput(false)}
-                className="text-xs text-muted hover:text-ink px-2"
+                onClick={() => setChatAttachment(null)}
+                className="p-1 rounded-lg text-muted hover:text-rose-500"
               >
-                Hủy
+                <X className="h-4 w-4" />
               </button>
+            </div>
+          )}
+
+          {isUploadingChatFile && (
+            <div className="p-2 mx-3 mb-2 rounded-xl border border-accent/30 bg-accent/10 flex items-center gap-2 text-xs font-mono text-ink">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
+              <span>Đang tải tệp lên phòng chat...</span>
             </div>
           )}
 
@@ -529,9 +572,10 @@ export function EncryptedChatClient({ locale }: { locale: Locale }) {
           >
             <button
               type="button"
-              onClick={() => setShowImageInput(!showImageInput)}
-              className="p-2 rounded-xl text-muted hover:text-ink hover:bg-canvas transition"
-              title="Đính kèm ảnh"
+              onClick={() => chatFileInputRef.current?.click()}
+              disabled={isUploadingChatFile}
+              className="p-2 rounded-xl text-muted hover:text-accent hover:bg-canvas transition active:scale-95"
+              title="Tải ảnh hoặc tệp từ thiết bị"
             >
               <Paperclip className="h-4 w-4" />
             </button>
@@ -546,8 +590,8 @@ export function EncryptedChatClient({ locale }: { locale: Locale }) {
 
             <button
               type="submit"
-              disabled={sending || (!inputText.trim() && !imageUrl.trim())}
-              className="grid h-10 w-10 place-items-center rounded-xl bg-accent text-white dark:text-[#04101F] hover:opacity-90 transition disabled:opacity-40 shadow-sm shrink-0"
+              disabled={sending || (!inputText.trim() && !chatAttachment)}
+              className="grid h-10 w-10 place-items-center rounded-xl bg-accent text-white dark:text-[#04101F] hover:opacity-90 transition disabled:opacity-40 shadow-sm shrink-0 active:scale-95"
             >
               <Send className="h-4 w-4" />
             </button>

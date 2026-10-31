@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { I18nProvider } from "@/components/providers/I18nProvider";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
+import { MobileBottomBar } from "@/components/layout/MobileBottomBar";
 
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
@@ -19,26 +20,29 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const t = getT(l, "home");
   const meta = buildMetadata({
     locale: l,
-    title: `${t("heroTitle")} ${t("heroHighlight")}`,
-    description: t("heroDesc"),
+    title: "Myso — Không Gian Cho Mọi Ý Tưởng",
+    description: "Mạng xã hội mở, bách khoa tri thức số, phòng chat mã hóa và nền tảng sáng tạo nội dung đa lĩnh vực.",
   });
   return {
     ...meta,
     title: {
-      default: "Mythos Running — Chạy có cơ sở",
-      template: "%s · Mythos Running",
+      default: "Myso — Không Gian Cho Mọi Ý Tưởng",
+      template: "%s · Myso",
     },
-    applicationName: "Mythos Running",
-    authors: [{ name: "Mythos Running" }],
-    creator: "Mythos Running",
+    applicationName: "Myso",
+    authors: [{ name: "Myso Network" }],
+    creator: "Myso",
     keywords: [
-      "chạy bộ",
-      "running",
-      "Huế",
-      "pace calculator",
-      "giáo án chạy bộ",
-      "running tools",
-      "Mythos Running",
+      "mạng xã hội",
+      "myso",
+      "ý tưởng",
+      "bách khoa số",
+      "wiki",
+      "công nghệ",
+      "AI",
+      "chat mã hóa",
+      "thảo luận",
+      "kiếm tiền sáng tạo",
     ],
     icons: {
       icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
@@ -50,9 +54,10 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#F7F9FC" },
-    { media: "(prefers-color-scheme: dark)", color: "#080D16" },
+    { media: "(prefers-color-scheme: light)", color: "#FFFFFF" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
   ],
 };
 
@@ -69,7 +74,7 @@ export default async function LocaleLayout({
 
   return (
     <html lang={htmlLang[locale]} suppressHydrationWarning>
-      <body>
+      <body className="pb-16 lg:pb-0">
         <ThemeProvider>
           <I18nProvider locale={locale}>
             <a
@@ -85,6 +90,7 @@ export default async function LocaleLayout({
               </main>
               <SiteFooter locale={locale} />
             </div>
+            <MobileBottomBar locale={locale} />
           </I18nProvider>
         </ThemeProvider>
         <JsonLd data={organizationSchema()} />

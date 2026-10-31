@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import {
   Heart,
@@ -26,8 +26,13 @@ import {
   Zap,
   BarChart3,
   Palette,
-  Eye,
   Search,
+  Paperclip,
+  Video,
+  FileText,
+  Loader2,
+  Download,
+  Eye,
 } from "lucide-react";
 import type { Locale } from "@/lib/i18n/settings";
 import { localePath } from "@/lib/i18n/settings";
@@ -37,11 +42,19 @@ import { getOrCreateAnonymousIdentity, type AnonymousIdentity } from "@/lib/anon
 import { inspectContent } from "@/lib/moderation";
 import { DoodleEmojiModal } from "@/components/social/DoodleEmojiModal";
 import { PostAnalyticsModal } from "@/components/social/PostAnalyticsModal";
+import { uploadMediaFile } from "@/lib/storage";
 import {
   getUserInterestProfile,
   trackUserInteraction,
   calculatePostAffinity,
 } from "@/lib/aiRecommendation";
+
+interface UploadedMediaItem {
+  url: string;
+  name: string;
+  type: string;
+  size: number;
+}
 
 interface SocialPostItem {
   id: string;
@@ -82,8 +95,13 @@ export function SocialFeedClient({
   const [activeTab, setActiveTab] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [postContent, setPostContent] = useState("");
-  const [imageUrlInput, setImageUrlInput] = useState("");
-  const [showImageField, setShowImageField] = useState(false);
+  const [uploadedMedia, setUploadedMedia] = useState<UploadedMediaItem[]>([]);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [uploadProgressMsg, setUploadProgressMsg] = useState<string | null>(null);
+
+  const mediaInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
+
   const [selectedIcon, setSelectedIcon] = useState<string | null>(null);
   const [isDoodleModalOpen, setIsDoodleModalOpen] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>("verified_shield_token");
@@ -175,12 +193,44 @@ export function SocialFeedClient({
     return result;
   }, [posts, activeTab, searchQuery]);
 
+  // Direct File Upload from Computer / Device
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, isDoc = false) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploadingMedia(true);
+    setUploadProgressMsg(`Đang tải lên ${files.length} tệp...`);
+
+    try {
+      const uploadedList: UploadedMediaItem[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setUploadProgressMsg(`Đang lưu: ${file.name} (${Math.round(file.size / 1024)} KB)...`);
+        const item = await uploadMediaFile(file, "posts");
+        uploadedList.push(item);
+      }
+      setUploadedMedia((prev) => [...prev, ...uploadedList]);
+      setUploadProgressMsg(null);
+    } catch (err: any) {
+      alert(`Lỗi khi tải tệp lên: ${err.message || "Vui lòng thử lại"}`);
+      setUploadProgressMsg(null);
+    } finally {
+      setIsUploadingMedia(false);
+      // Reset input value so same file can be re-selected if desired
+      e.target.value = "";
+    }
+  };
+
+  const removeUploadedMedia = (index: number) => {
+    setUploadedMedia((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
   // Handle Post Creation
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
     setModerationWarning(null);
 
-    if (!postContent.trim()) return;
+    if (!postContent.trim() && uploadedMedia.length === 0) return;
 
     // Automated Keyword Moderation Filter
     const modResult = inspectContent(postContent);
@@ -190,7 +240,7 @@ export function SocialFeedClient({
     }
 
     setPosting(true);
-    const mediaUrls = imageUrlInput.trim() ? [imageUrlInput.trim()] : [];
+    const mediaUrls = uploadedMedia.map((m) => m.url);
     const author = anonIdentity || { displayName: "Thành viên Myso", handle: "user" };
 
     const optimisticPost: SocialPostItem = {
@@ -213,8 +263,7 @@ export function SocialFeedClient({
 
     setPosts([optimisticPost, ...posts]);
     setPostContent("");
-    setImageUrlInput("");
-    setShowImageField(false);
+    setUploadedMedia([]);
     setSelectedIcon(null);
 
     // Track AI behavior
@@ -241,7 +290,7 @@ export function SocialFeedClient({
         if (data.post) {
           setPosts((prev) => prev.map((p) => (p.id === optimisticPost.id ? data.post : p)));
 
-          // Realistic community bot engagement simulation after 3.5s
+          // Realistic bot engagement simulation
           setTimeout(() => {
             fetch("/api/social/bot-engage", {
               method: "POST",
@@ -263,104 +312,93 @@ export function SocialFeedClient({
         }
       }
     } catch (err) {
-      console.error("Post create failed:", err);
+      console.error("Create post error:", err);
     } finally {
       setPosting(false);
     }
   };
 
-  // Reactions: Like
+  // Interactions
   const handleLike = async (postId: string) => {
     const isLiked = likedPosts[postId] || false;
-    const delta = isLiked ? -1 : 1;
     setLikedPosts((prev) => ({ ...prev, [postId]: !isLiked }));
     setPosts((prev) =>
-      prev.map((p) => (p.id === postId ? { ...p, likes_count: Math.max(0, p.likes_count + delta) } : p))
+      prev.map((p) =>
+        p.id === postId ? { ...p, likes_count: p.likes_count + (isLiked ? -1 : 1) } : p
+      )
     );
 
     const post = posts.find((p) => p.id === postId);
-    if (post) trackUserInteraction(post.category, [], "like");
+    if (post && !isLiked) trackUserInteraction(post.category, [], "like");
 
     try {
-      fetch("/api/social/react", {
+      await fetch("/api/social/react", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ post_id: postId, type: "like", delta }),
-      }).catch(() => {});
+        body: JSON.stringify({ post_id: postId, reaction_type: "like" }),
+      });
     } catch {}
   };
 
-  // Reactions: Repost
-  const handleRepost = async (postId: string) => {
-    const isReposted = repostedPosts[postId] || false;
-    const delta = isReposted ? -1 : 1;
-    setRepostedPosts((prev) => ({ ...prev, [postId]: !isReposted }));
-    setPosts((prev) =>
-      prev.map((p) => (p.id === postId ? { ...p, reposts_count: Math.max(0, p.reposts_count + delta) } : p))
-    );
-
-    try {
-      fetch("/api/social/react", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ post_id: postId, type: "repost", delta }),
-      }).catch(() => {});
-    } catch {}
-  };
-
-  // Reactions: Bookmark
   const handleBookmark = async (postId: string) => {
     const isBookmarked = bookmarkedPosts[postId] || false;
-    const delta = isBookmarked ? -1 : 1;
     setBookmarkedPosts((prev) => ({ ...prev, [postId]: !isBookmarked }));
     setPosts((prev) =>
-      prev.map((p) => (p.id === postId ? { ...p, bookmarks_count: Math.max(0, p.bookmarks_count + delta) } : p))
+      prev.map((p) =>
+        p.id === postId ? { ...p, bookmarks_count: p.bookmarks_count + (isBookmarked ? -1 : 1) } : p
+      )
     );
 
+    const post = posts.find((p) => p.id === postId);
+    if (post && !isBookmarked) trackUserInteraction(post.category, [], "bookmark");
+
     try {
-      fetch("/api/social/react", {
+      await fetch("/api/social/react", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ post_id: postId, type: "bookmark", delta }),
-      }).catch(() => {});
+        body: JSON.stringify({ post_id: postId, reaction_type: "bookmark" }),
+      });
     } catch {}
   };
 
-  // Share Link
-  const handleShare = (postId: string) => {
-    if (typeof window !== "undefined") {
-      navigator.clipboard.writeText(window.location.href);
-      setCopiedId(postId);
-      setTimeout(() => setCopiedId(null), 2000);
-    }
+  const handleRepost = async (postId: string) => {
+    const isReposted = repostedPosts[postId] || false;
+    setRepostedPosts((prev) => ({ ...prev, [postId]: !isReposted }));
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === postId ? { ...p, reposts_count: p.reposts_count + (isReposted ? -1 : 1) } : p
+      )
+    );
+
+    const post = posts.find((p) => p.id === postId);
+    if (post && !isReposted) trackUserInteraction(post.category, [], "repost");
+
+    try {
+      await fetch("/api/social/react", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ post_id: postId, reaction_type: "repost" }),
+      });
+    } catch {}
   };
 
-  // View recording & Analytics opener
+  const handleShare = (postId: string) => {
+    const url = `${window.location.origin}/?post=${postId}`;
+    navigator.clipboard.writeText(url);
+    setCopiedId(postId);
+    setTimeout(() => setCopiedId(null), 2500);
+  };
+
   const handleOpenAnalytics = (post: SocialPostItem) => {
     setAnalyticsPost(post);
-    // Record view in DB
-    fetch("/api/social/view", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ post_id: post.id }),
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.views_count) {
-          setPosts((prev) =>
-            prev.map((p) => (p.id === post.id ? { ...p, views_count: data.views_count } : p))
-          );
-        }
-      })
-      .catch(() => {});
   };
 
-  // Toggle & Fetch Comments
+  // Toggle comments
   const toggleComments = async (postId: string) => {
-    const isExpanded = expandedPostComments[postId];
-    setExpandedPostComments((prev) => ({ ...prev, [postId]: !isExpanded }));
+    const currentlyExpanded = expandedPostComments[postId] || false;
+    setExpandedPostComments((prev) => ({ ...prev, [postId]: !currentlyExpanded }));
 
-    if (!isExpanded && !commentsMap[postId]) {
+    if (!currentlyExpanded && !commentsMap[postId]) {
       try {
         const res = await fetch(`/api/social/comment?post_id=${postId}`);
         if (res.ok) {
@@ -371,12 +409,11 @@ export function SocialFeedClient({
     }
   };
 
-  // Submit Comment with Anonymous Identity & Keyword Filter
+  // Send comment
   const handleSendComment = async (postId: string) => {
     const text = commentInputs[postId] || "";
     if (!text.trim()) return;
 
-    // Automated Moderation Check
     const mod = inspectContent(text);
     if (!mod.isAllowed) {
       alert(mod.userMessage);
@@ -384,7 +421,7 @@ export function SocialFeedClient({
     }
 
     setSubmittingComment((prev) => ({ ...prev, [postId]: true }));
-    const author = anonIdentity || { displayName: "Thành viên Ẩn danh #1024", handle: "guest_1024" };
+    const author = anonIdentity || { displayName: "Thành viên Ẩn danh", handle: "guest" };
 
     const newComment: SocialCommentItem = {
       id: `c-${Date.now()}`,
@@ -482,11 +519,33 @@ export function SocialFeedClient({
     }
   };
 
+  // Helper to check if a URL is video
+  const isVideoUrl = (url: string) => {
+    return /\.(mp4|webm|ogg|mov)$/i.test(url) || url.includes("video/");
+  };
+
   return (
     <div className="container-page py-4 sm:py-6 max-w-7xl">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Navigation Bar (3 cols) */}
-        <nav className="hidden lg:block lg:col-span-3 sticky top-20 space-y-4">
+      {/* Hidden file inputs */}
+      <input
+        type="file"
+        ref={mediaInputRef}
+        accept="image/*,video/*"
+        multiple
+        className="hidden"
+        onChange={(e) => handleFileUpload(e, false)}
+      />
+      <input
+        type="file"
+        ref={docInputRef}
+        accept=".pdf,.doc,.docx,.zip,.txt"
+        className="hidden"
+        onChange={(e) => handleFileUpload(e, true)}
+      />
+
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-5 lg:gap-6 items-start">
+        {/* Left Navigation Bar (Desktop: 3 cols) */}
+        <nav className="hidden xl:block xl:col-span-3 sticky top-20 space-y-4">
           <div className="rounded-3xl border border-line bg-surface p-4 space-y-1.5 shadow-sm">
             <Link
               href={localePath(locale, "/")}
@@ -547,12 +606,12 @@ export function SocialFeedClient({
                 className="flex items-center gap-3.5 px-4 py-2.5 rounded-2xl text-subtle hover:text-ink text-xs font-mono transition"
               >
                 <ShieldCheck className="h-4 w-4 text-accent" />
-                <span>Tiêu chuẩn & Pháp lý CQCN</span>
+                <span>Tiêu chuẩn & Pháp lý</span>
               </Link>
             </div>
           </div>
 
-          {/* User Profile Quick Card */}
+          {/* Quick Profile Card */}
           <div className="rounded-3xl border border-line bg-surface p-4 shadow-sm">
             <div className="flex items-center gap-3 mb-3">
               <img
@@ -571,15 +630,15 @@ export function SocialFeedClient({
             </div>
             <Link
               href={localePath(locale, "/login")}
-              className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-canvas border border-line px-3 py-2 text-xs font-semibold text-ink hover:border-accent transition"
+              className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-canvas border border-line px-3 py-2 text-xs font-semibold text-ink hover:border-accent transition active:scale-95"
             >
               Tạo tài khoản / Thiết lập hồ sơ
             </Link>
           </div>
         </nav>
 
-        {/* Center Main Feed (6 cols) */}
-        <main className="lg:col-span-6 space-y-4">
+        {/* Center Main Feed (Mobile & Foldable: 12 cols, iPad: 7 cols, Desktop: 6 cols) */}
+        <main className="col-span-1 md:col-span-7 xl:col-span-6 space-y-4">
           {/* Real-time Search Bar */}
           <div className="relative">
             <Search className="absolute left-3.5 top-3 h-4 w-4 text-subtle" />
@@ -600,8 +659,8 @@ export function SocialFeedClient({
             )}
           </div>
 
-          {/* Top Sticky Filter Tabs */}
-          <div className="sticky top-16 z-20 rounded-2xl border border-line bg-surface/95 backdrop-blur p-1.5 flex items-center justify-between gap-1 overflow-x-auto shadow-xs scrollbar-none">
+          {/* Top Category Filter Tabs */}
+          <div className="sticky top-16 z-20 rounded-2xl border border-line bg-surface/95 backdrop-blur-md p-1.5 flex items-center justify-between gap-1 overflow-x-auto shadow-xs scrollbar-none">
             {[
               { id: "all", label: "Dành cho bạn 🔥" },
               { id: "ai", label: "Công nghệ & AI" },
@@ -612,7 +671,7 @@ export function SocialFeedClient({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition ${
+                className={`px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold whitespace-nowrap transition active:scale-95 ${
                   activeTab === tab.id
                     ? "bg-accent text-white dark:text-[#04101F] shadow-xs"
                     : "text-muted hover:text-ink hover:bg-canvas"
@@ -623,7 +682,7 @@ export function SocialFeedClient({
             ))}
           </div>
 
-          {/* Post Composer */}
+          {/* Post Composer with Direct File Upload */}
           <div className="rounded-3xl border border-line bg-surface p-4 sm:p-5 shadow-sm space-y-3">
             <div className="flex items-start gap-3">
               <img
@@ -636,7 +695,7 @@ export function SocialFeedClient({
                   rows={3}
                   value={postContent}
                   onChange={(e) => setPostContent(e.target.value)}
-                  placeholder="Bạn đang nghĩ gì? Chia sẻ ý tưởng, góc nhìn (hỗ trợ in đậm **chữ**, liên kết, hashtag)..."
+                  placeholder="Bạn đang nghĩ gì? Chia sẻ ý tưởng, đính kèm ảnh/video từ máy (in đậm **chữ**, liên kết, hashtag)..."
                   className="w-full bg-transparent text-sm sm:text-base text-ink placeholder:text-subtle focus:outline-none resize-none leading-relaxed"
                 />
 
@@ -661,6 +720,52 @@ export function SocialFeedClient({
               </div>
             </div>
 
+            {/* Uploaded Media / Files Preview */}
+            {uploadedMedia.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-2 rounded-2xl border border-line bg-canvas">
+                {uploadedMedia.map((media, idx) => (
+                  <div key={idx} className="relative group rounded-xl overflow-hidden border border-line/60 bg-surface">
+                    {isVideoUrl(media.url) ? (
+                      <div className="h-28 w-full bg-black flex items-center justify-center relative">
+                        <video src={media.url} className="h-full w-full object-cover" />
+                        <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                          <Video className="h-6 w-6 text-white" />
+                        </div>
+                      </div>
+                    ) : media.type.startsWith("image/") ? (
+                      <img src={media.url} alt={media.name} className="h-28 w-full object-cover" />
+                    ) : (
+                      <div className="h-28 w-full p-2 flex flex-col items-center justify-center text-center">
+                        <FileText className="h-6 w-6 text-accent mb-1" />
+                        <span className="text-[0.68rem] text-ink font-mono truncate max-w-full px-1">
+                          {media.name}
+                        </span>
+                        <span className="text-[0.6rem] text-muted font-mono">
+                          {Math.round(media.size / 1024)} KB
+                        </span>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeUploadedMedia(idx)}
+                      className="absolute top-1 right-1 p-1 rounded-full bg-black/70 text-white hover:bg-rose-600 transition"
+                      title="Gỡ tệp"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Uploading indicator */}
+            {isUploadingMedia && (
+              <div className="flex items-center gap-2 p-2.5 rounded-xl border border-accent/30 bg-accent/10 text-xs text-ink font-mono">
+                <Loader2 className="h-4 w-4 animate-spin text-accent" />
+                <span>{uploadProgressMsg || "Đang tải tệp lên máy chủ..."}</span>
+              </div>
+            )}
+
             {moderationWarning && (
               <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-xs text-rose-400 font-mono flex items-center gap-2">
                 <AlertCircle className="h-4 w-4 shrink-0" />
@@ -668,36 +773,15 @@ export function SocialFeedClient({
               </div>
             )}
 
-            {/* Image input expand */}
-            {showImageField && (
-              <div className="rounded-2xl border border-line bg-canvas p-3 flex items-center gap-2">
-                <ImageIcon className="h-4 w-4 text-accent" />
-                <input
-                  type="url"
-                  value={imageUrlInput}
-                  onChange={(e) => setImageUrlInput(e.target.value)}
-                  placeholder="Dán URL hình ảnh (https://...)..."
-                  className="flex-1 bg-transparent text-xs text-ink placeholder:text-subtle focus:outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowImageField(false)}
-                  className="text-xs text-muted hover:text-ink"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            )}
-
             {/* Quick Hashtags Chips */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[0.7rem] font-mono text-muted">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[0.7rem] font-mono text-muted scrollbar-none">
               <span className="text-subtle font-semibold">Gợi ý:</span>
               {["#Myso", "#AI", "#KhoaHoc", "#CongNghe", "#KhoiNghiep"].map((tag) => (
                 <button
                   key={tag}
                   type="button"
                   onClick={() => setPostContent((prev) => `${prev} ${tag} `)}
-                  className="px-2 py-0.5 rounded-full border border-line bg-canvas hover:border-accent text-accent"
+                  className="px-2 py-0.5 rounded-full border border-line bg-canvas hover:border-accent text-accent transition"
                 >
                   {tag}
                 </button>
@@ -710,14 +794,31 @@ export function SocialFeedClient({
             {/* Action Bar */}
             <div className="flex items-center justify-between pt-2 border-t border-line">
               <div className="flex items-center gap-1">
+                {/* Upload Photo/Video Button */}
                 <button
                   type="button"
-                  onClick={() => setShowImageField(!showImageField)}
-                  className="p-2 rounded-xl text-accent hover:bg-accent/10 transition"
-                  title="Thêm ảnh"
+                  onClick={() => mediaInputRef.current?.click()}
+                  disabled={isUploadingMedia}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-line bg-canvas hover:border-accent text-xs font-semibold text-ink transition active:scale-95"
+                  title="Chọn ảnh hoặc video từ máy tính / điện thoại"
                 >
-                  <ImageIcon className="h-4 w-4" />
+                  <ImageIcon className="h-4 w-4 text-accent" />
+                  <span className="hidden sm:inline">Ảnh / Video</span>
                 </button>
+
+                {/* Upload Document / File Button */}
+                <button
+                  type="button"
+                  onClick={() => docInputRef.current?.click()}
+                  disabled={isUploadingMedia}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-line bg-canvas hover:border-accent text-xs font-semibold text-ink transition active:scale-95"
+                  title="Chọn tệp tài liệu PDF, DOC, ZIP từ thiết bị"
+                >
+                  <Paperclip className="h-4 w-4 text-teal" />
+                  <span className="hidden sm:inline">Tệp đính kèm</span>
+                </button>
+
+                {/* Doodle Modal */}
                 <button
                   type="button"
                   onClick={() => setIsDoodleModalOpen(true)}
@@ -725,8 +826,9 @@ export function SocialFeedClient({
                   title="Vẽ doodle hoặc chọn emoji cho bài viết"
                 >
                   <Palette className="h-4 w-4" />
-                  <span className="hidden sm:inline font-medium">Doodle / Emoji</span>
                 </button>
+
+                {/* Hashtag */}
                 <button
                   type="button"
                   onClick={() => setPostContent((prev) => `${prev} #`)}
@@ -740,8 +842,8 @@ export function SocialFeedClient({
               <button
                 type="button"
                 onClick={handleCreatePost}
-                disabled={posting || !postContent.trim()}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs sm:text-sm font-semibold text-white dark:text-[#04101F] hover:opacity-90 transition disabled:opacity-40 shadow-sm"
+                disabled={posting || (!postContent.trim() && uploadedMedia.length === 0)}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-5 py-2 text-xs sm:text-sm font-semibold text-white dark:text-[#04101F] hover:opacity-90 transition disabled:opacity-40 shadow-sm active:scale-95"
               >
                 <Send className="h-3.5 w-3.5" />
                 <span>{posting ? "Đang đăng..." : "Đăng ngay"}</span>
@@ -858,15 +960,49 @@ export function SocialFeedClient({
                       </p>
                     )}
 
-                    {/* Media Gallery */}
+                    {/* Media / Video / File Gallery */}
                     {post.media_urls && post.media_urls.length > 0 && (
-                      <div className="rounded-2xl overflow-hidden border border-line max-h-96">
-                        <img
-                          src={post.media_urls[0]}
-                          alt="Media attachment"
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
+                      <div className="space-y-2 pt-1">
+                        {post.media_urls.map((url, idx) => {
+                          if (isVideoUrl(url)) {
+                            return (
+                              <div key={idx} className="rounded-2xl overflow-hidden border border-line bg-black">
+                                <video
+                                  controls
+                                  playsInline
+                                  preload="metadata"
+                                  className="w-full max-h-[460px] object-contain"
+                                  src={url}
+                                />
+                              </div>
+                            );
+                          }
+                          if (/\.(pdf|doc|docx|zip|txt)$/i.test(url)) {
+                            return (
+                              <a
+                                key={idx}
+                                href={url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-2 p-3 rounded-2xl border border-line bg-canvas hover:border-accent text-xs font-mono text-ink transition"
+                              >
+                                <FileText className="h-5 w-5 text-accent" />
+                                <span className="underline truncate max-w-xs">{url.split("/").pop()}</span>
+                                <Download className="h-4 w-4 text-muted ml-auto" />
+                              </a>
+                            );
+                          }
+                          return (
+                            <div key={idx} className="rounded-2xl overflow-hidden border border-line max-h-[500px]">
+                              <img
+                                src={url}
+                                alt="Ảnh đính kèm"
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                              />
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
 
@@ -944,9 +1080,9 @@ export function SocialFeedClient({
                     {isCommentsExpanded && (
                       <div className="pt-3 border-t border-line space-y-3">
                         <div className="text-[0.68rem] font-mono text-subtle flex items-center justify-between">
-                          <span>Bình luận dưới danh nghĩa: <strong>{anonIdentity?.displayName}</strong></span>
+                          <span>Bình luận với tư cách: <strong>{anonIdentity?.displayName}</strong></span>
                           <Link href={localePath(locale, "/login")} className="text-accent underline">
-                            Đăng nhập để dùng tên thật
+                            Đăng nhập tài khoản
                           </Link>
                         </div>
 
@@ -1010,8 +1146,8 @@ export function SocialFeedClient({
           </div>
         </main>
 
-        {/* Right Sidebar: Trends, Streaks, Compliance (3 cols) */}
-        <aside className="hidden lg:block lg:col-span-3 sticky top-20 space-y-5">
+        {/* Right Sidebar: Trends & Streaks (iPad: 5 cols, Desktop: 3 cols) */}
+        <aside className="hidden md:block md:col-span-5 xl:col-span-3 sticky top-20 space-y-5">
           {/* Daily Streak & Gamification Card */}
           <div className="rounded-3xl border border-line bg-surface p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
@@ -1035,7 +1171,7 @@ export function SocialFeedClient({
               className={`w-full py-2.5 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-2 shadow-xs ${
                 checkedInToday
                   ? "bg-teal/20 text-teal border border-teal/40"
-                  : "bg-accent text-white dark:text-[#04101F] hover:opacity-90"
+                  : "bg-accent text-white dark:text-[#04101F] hover:opacity-90 active:scale-95"
               }`}
             >
               {checkedInToday ? (

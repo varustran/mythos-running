@@ -1,30 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   Github,
   Loader2,
-  Mail,
   KeyRound,
   ShieldCheck,
-  CheckCircle2,
-  User,
-  AtSign,
   Sparkles,
   Camera,
   ArrowRight,
-  ShieldAlert,
   Smartphone,
   Lock,
-  Info,
   Eye,
   EyeOff,
+  Upload,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { AntiSpamCaptcha } from "@/components/security/AntiSpamCaptcha";
+import { uploadMediaFile } from "@/lib/storage";
 
 const fieldClass =
-  "w-full rounded-xl border border-line bg-canvas px-3.5 py-2.5 text-xs sm:text-sm text-ink outline-none transition placeholder:text-subtle focus:border-accent";
+  "w-full rounded-xl border border-line bg-canvas px-3.5 py-2.5 text-xs sm:text-sm text-ink outline-none transition placeholder:text-subtle focus:border-accent focus:ring-1 focus:ring-accent/40";
 
 const AVATAR_PRESETS = [
   "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
@@ -38,32 +34,80 @@ export function LoginForm({ locale }: { locale: string }) {
   const [activeTab, setActiveTab] = useState<"login" | "register" | "2fa">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
   const [selectedAvatar, setSelectedAvatar] = useState(AVATAR_PRESETS[0]);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
   const [otpCode, setOtpCode] = useState("");
   const [totpCode, setTotpCode] = useState("");
   const [mode, setMode] = useState<"form" | "otp_verify">("form");
   const [captchaToken, setCaptchaToken] = useState<string | null>("auto_verified_token");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error" | "verified">("idle");
   const [statusMsg, setStatusMsg] = useState<string>("");
-  const [oauthNotice, setOauthNotice] = useState<string | null>(null);
 
   const redirectTo = () => `${window.location.origin}/auth/callback?next=/${locale}`;
 
-  // Informative handler for third-party OAuth
-  function handleOAuthClick(providerName: string) {
-    setOauthNotice(
-      `Cổng đăng nhập ${providerName} yêu cầu cài đặt Client ID trong Supabase Dashboard. Bạn có thể sử dụng Đăng Ký / Đăng Nhập Email & Mật Khẩu ngay bên dưới — hoàn toàn tức thì và không cần cấu hình bên ngoài!`
-    );
+  // Live OAuth sign-in handler
+  async function handleOAuth(provider: "google" | "github" | "twitter") {
+    const supabase = createClient();
+    if (!supabase) return;
+
+    setStatus("sending");
+    setStatusMsg(`Đang chuyển hướng xác thực qua ${provider === "twitter" ? "X / Twitter" : provider}...`);
+
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: redirectTo(),
+        },
+      });
+
+      if (error) {
+        setStatus("error");
+        setStatusMsg(`Lỗi đăng nhập ${provider}: ${error.message}`);
+      }
+    } catch (err: any) {
+      setStatus("error");
+      setStatusMsg(`Không thể kết nối cổng ${provider}: ${err.message}`);
+    }
+  }
+
+  // Handle Custom Avatar File Upload
+  async function handleAvatarFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setStatus("error");
+      setStatusMsg("Vui lòng chọn tệp định dạng ảnh (JPEG, PNG, WebP, GIF).");
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    setStatusMsg("");
+    try {
+      const { url } = await uploadMediaFile(file, "avatars");
+      setSelectedAvatar(url);
+      setStatus("verified");
+      setStatusMsg("Đã tải ảnh đại diện lên thành công!");
+    } catch (err: any) {
+      setStatus("error");
+      setStatusMsg(err.message || "Lỗi tải ảnh đại diện lên máy chủ.");
+    } finally {
+      setIsUploadingAvatar(false);
+    }
   }
 
   // Handle Sign In (Email & Password or OTP)
   async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
-    setOauthNotice(null);
 
     const supabase = createClient();
     if (!supabase) return;
@@ -83,7 +127,7 @@ export function LoginForm({ locale }: { locale: string }) {
         setStatusMsg("Đăng nhập thành công! Đang chuyển hướng vào bảng tin...");
         setTimeout(() => {
           window.location.href = `/${locale}`;
-        }, 800);
+        }, 600);
         return;
       }
 
@@ -117,7 +161,6 @@ export function LoginForm({ locale }: { locale: string }) {
   // Handle Sign Up & Instant Profile Creation
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
-    setOauthNotice(null);
 
     if (!username.trim()) {
       setStatus("error");
@@ -128,6 +171,13 @@ export function LoginForm({ locale }: { locale: string }) {
     if (password.trim().length < 6) {
       setStatus("error");
       setStatusMsg("Mật khẩu phải chứa ít nhất 6 ký tự.");
+      return;
+    }
+
+    // Password confirmation check
+    if (password !== confirmPassword) {
+      setStatus("error");
+      setStatusMsg("Mật khẩu xác nhận không trùng khớp. Vui lòng nhập lại chính xác.");
       return;
     }
 
@@ -142,7 +192,7 @@ export function LoginForm({ locale }: { locale: string }) {
     // Check reserved admin username
     if (cleanUsername === "myso" && email.toLowerCase() !== "chuitv1907@gmail.com") {
       setStatus("error");
-      setStatusMsg("Tên định danh @myso là tên của Quản trị viên hệ sinh thái Myso.");
+      setStatusMsg("Tên định danh @myso dành riêng cho Quản trị viên hệ sinh thái Myso.");
       return;
     }
 
@@ -186,7 +236,7 @@ export function LoginForm({ locale }: { locale: string }) {
     setStatusMsg("Tạo tài khoản thành công! Đang tự động chuyển hướng vào Myso...");
     setTimeout(() => {
       window.location.href = `/${locale}`;
-    }, 1000);
+    }, 800);
   }
 
   // Verify OTP Code
@@ -248,7 +298,7 @@ export function LoginForm({ locale }: { locale: string }) {
   }
 
   return (
-    <div className="card p-6 sm:p-8 border border-line bg-surface shadow-2xl max-w-lg mx-auto">
+    <div className="card p-6 sm:p-8 border border-line bg-surface shadow-2xl max-w-lg mx-auto rounded-2xl">
       {/* Header Badge */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
@@ -269,7 +319,6 @@ export function LoginForm({ locale }: { locale: string }) {
           onClick={() => {
             setActiveTab("login");
             setStatusMsg("");
-            setOauthNotice(null);
           }}
           className={`py-2 text-[0.72rem] sm:text-xs font-semibold rounded-lg transition ${
             activeTab === "login"
@@ -284,7 +333,6 @@ export function LoginForm({ locale }: { locale: string }) {
           onClick={() => {
             setActiveTab("register");
             setStatusMsg("");
-            setOauthNotice(null);
           }}
           className={`py-2 text-[0.72rem] sm:text-xs font-semibold rounded-lg transition ${
             activeTab === "register"
@@ -299,7 +347,6 @@ export function LoginForm({ locale }: { locale: string }) {
           onClick={() => {
             setActiveTab("2fa");
             setStatusMsg("");
-            setOauthNotice(null);
           }}
           className={`py-2 text-[0.72rem] sm:text-xs font-semibold rounded-lg transition ${
             activeTab === "2fa"
@@ -320,27 +367,20 @@ export function LoginForm({ locale }: { locale: string }) {
       </h1>
       <p className="mt-1 text-xs sm:text-sm text-muted leading-relaxed">
         {activeTab === "login"
-          ? "Đăng nhập nhanh để tương tác, viết bài và tham gia cộng đồng."
+          ? "Đăng nhập nhanh để tương tác, đăng ảnh, video và tham gia cộng đồng."
           : activeTab === "register"
-          ? "Thiết lập profile cá nhân, chọn avatar và tham gia mạng lưới sáng tạo mở."
+          ? "Thiết lập profile cá nhân, tải ảnh đại diện tùy ý và bắt đầu ngay."
           : "Nhập mã số 6 chữ số từ ứng dụng xác thực Google Authenticator hoặc Authy."}
       </p>
 
-      {/* Notice about OAuth provider if triggered */}
-      {oauthNotice && (
-        <div className="mt-4 p-3.5 rounded-xl border border-accent/30 bg-accent/10 text-ink text-xs leading-relaxed flex items-start gap-2.5">
-          <Info className="h-4 w-4 shrink-0 mt-0.5 text-accent" />
-          <p className="font-medium">{oauthNotice}</p>
-        </div>
-      )}
-
-      {/* Social Logins - Informative one-click guidance */}
+      {/* Social Logins - Real Live OAuth Providers */}
       {activeTab !== "2fa" && (
         <div className="mt-5 space-y-2.5">
           <button
             type="button"
-            onClick={() => handleOAuthClick("Google")}
-            className="inline-flex w-full items-center justify-center gap-2.5 rounded-xl border border-line bg-canvas px-4 py-2.5 text-xs sm:text-sm font-semibold text-ink transition hover:border-accent shadow-xs"
+            onClick={() => handleOAuth("google")}
+            disabled={status === "sending"}
+            className="inline-flex w-full items-center justify-center gap-2.5 rounded-xl border border-line bg-canvas px-4 py-2.5 text-xs sm:text-sm font-semibold text-ink transition hover:border-accent hover:bg-surface/50 shadow-xs active:scale-[0.99]"
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24">
               <path
@@ -369,8 +409,9 @@ export function LoginForm({ locale }: { locale: string }) {
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              onClick={() => handleOAuthClick("Tài khoản X")}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-canvas px-3 py-2 text-xs font-semibold text-ink transition hover:border-accent shadow-xs"
+              onClick={() => handleOAuth("twitter")}
+              disabled={status === "sending"}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-canvas px-3 py-2 text-xs font-semibold text-ink transition hover:border-accent hover:bg-surface/50 shadow-xs active:scale-[0.99]"
             >
               <svg className="h-3.5 w-3.5 fill-current" viewBox="0 0 24 24">
                 <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
@@ -380,8 +421,9 @@ export function LoginForm({ locale }: { locale: string }) {
 
             <button
               type="button"
-              onClick={() => handleOAuthClick("GitHub")}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-canvas px-3 py-2 text-xs font-semibold text-ink transition hover:border-accent shadow-xs"
+              onClick={() => handleOAuth("github")}
+              disabled={status === "sending"}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-canvas px-3 py-2 text-xs font-semibold text-ink transition hover:border-accent hover:bg-surface/50 shadow-xs active:scale-[0.99]"
             >
               <Github className="h-3.5 w-3.5" />
               <span>GitHub</span>
@@ -426,7 +468,7 @@ export function LoginForm({ locale }: { locale: string }) {
           <button
             type="submit"
             disabled={status === "sending" || totpCode.length !== 6}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3 text-xs sm:text-sm font-semibold text-white transition hover:bg-accent/90 disabled:opacity-50 dark:text-[#04101F] shadow-lg"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3 text-xs sm:text-sm font-semibold text-white transition hover:bg-accent/90 disabled:opacity-50 dark:text-[#04101F] shadow-lg active:scale-[0.99]"
           >
             {status === "sending" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
             Xác Thực 2FA & Đăng Nhập
@@ -453,7 +495,7 @@ export function LoginForm({ locale }: { locale: string }) {
           <button
             type="submit"
             disabled={status === "sending"}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-teal px-5 py-3 text-xs sm:text-sm font-semibold text-black transition hover:bg-teal/90 disabled:opacity-60 shadow-lg"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-teal px-5 py-3 text-xs sm:text-sm font-semibold text-black transition hover:bg-teal/90 disabled:opacity-60 shadow-lg active:scale-[0.99]"
           >
             {status === "sending" ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
             Xác Nhận & Đăng Nhập
@@ -512,7 +554,7 @@ export function LoginForm({ locale }: { locale: string }) {
           <button
             type="submit"
             disabled={status === "sending"}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3 text-xs sm:text-sm font-semibold text-white transition hover:bg-accent/90 disabled:opacity-50 dark:text-[#04101F] shadow-lg"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3 text-xs sm:text-sm font-semibold text-white transition hover:bg-accent/90 disabled:opacity-50 dark:text-[#04101F] shadow-lg active:scale-[0.99]"
           >
             {status === "sending" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
             Đăng Nhập Vào Myso
@@ -521,37 +563,76 @@ export function LoginForm({ locale }: { locale: string }) {
       ) : (
         /* Register & Profile Setup Form */
         <form onSubmit={handleSignUp} className="space-y-3.5">
-          {/* Avatar Picker */}
+          {/* Custom Avatar Picker with File Upload */}
           <div>
             <label className="mb-1.5 block text-xs font-mono text-subtle">
-              Chọn ảnh đại diện (Avatar)
+              Ảnh đại diện (Tải từ máy tính / điện thoại hoặc chọn nhanh)
             </label>
-            <div className="flex items-center gap-3">
-              <img
-                src={selectedAvatar}
-                alt="Selected Avatar"
-                className="h-12 w-12 rounded-full object-cover border-2 border-accent shadow-sm"
-              />
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-                {AVATAR_PRESETS.map((av, idx) => (
+            <input
+              type="file"
+              ref={avatarInputRef}
+              accept="image/*"
+              className="hidden"
+              onChange={handleAvatarFileSelect}
+            />
+
+            <div className="flex items-center gap-3 p-2.5 rounded-xl border border-line bg-canvas">
+              <div className="relative group shrink-0">
+                <img
+                  src={selectedAvatar}
+                  alt="Selected Avatar"
+                  className="h-14 w-14 rounded-full object-cover border-2 border-accent shadow-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition text-white"
+                  title="Tải ảnh mới từ thiết bị"
+                >
+                  <Camera className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-2">
                   <button
-                    key={idx}
                     type="button"
-                    onClick={() => setSelectedAvatar(av)}
-                    className={`h-8 w-8 rounded-full overflow-hidden border transition ${
-                      selectedAvatar === av ? "border-accent scale-110 ring-2 ring-accent/30" : "border-line opacity-70 hover:opacity-100"
-                    }`}
+                    onClick={() => avatarInputRef.current?.click()}
+                    disabled={isUploadingAvatar}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-line bg-surface hover:border-accent text-xs font-semibold text-ink transition active:scale-95"
                   >
-                    <img src={av} alt="Preset" className="h-full w-full object-cover" />
+                    {isUploadingAvatar ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
+                    ) : (
+                      <Upload className="h-3.5 w-3.5 text-accent" />
+                    )}
+                    <span>{isUploadingAvatar ? "Đang tải ảnh..." : "Tải ảnh từ thiết bị"}</span>
                   </button>
-                ))}
+                  <span className="text-[0.68rem] text-muted hidden sm:inline">PNG, JPG, WebP tối đa 10MB</span>
+                </div>
+
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+                  <span className="text-[0.65rem] font-mono text-muted mr-1">Mẫu sẵn:</span>
+                  {AVATAR_PRESETS.map((av, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setSelectedAvatar(av)}
+                      className={`h-7 w-7 rounded-full overflow-hidden border transition shrink-0 ${
+                        selectedAvatar === av ? "border-accent scale-110 ring-2 ring-accent/30" : "border-line opacity-70 hover:opacity-100"
+                      }`}
+                    >
+                      <img src={av} alt={`Mẫu ${idx + 1}`} className="h-full w-full object-cover" />
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-mono text-subtle">Tên hiển thị</label>
+              <label className="mb-1 block text-xs font-mono text-subtle">Tên hiển thị *</label>
               <input
                 required
                 type="text"
@@ -563,7 +644,7 @@ export function LoginForm({ locale }: { locale: string }) {
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-mono text-subtle">Tên định danh (@username)</label>
+              <label className="mb-1 block text-xs font-mono text-subtle">Tên định danh (@username) *</label>
               <div className="relative">
                 <span className="absolute left-3 top-2.5 text-xs font-mono text-muted">@</span>
                 <input
@@ -579,7 +660,7 @@ export function LoginForm({ locale }: { locale: string }) {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-mono text-subtle">Email</label>
+            <label className="mb-1 block text-xs font-mono text-subtle">Email tài khoản *</label>
             <input
               required
               type="email"
@@ -590,28 +671,62 @@ export function LoginForm({ locale }: { locale: string }) {
             />
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-mono text-subtle">Mật khẩu (tối thiểu 6 ký tự)</label>
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="text-[0.68rem] text-muted hover:text-ink flex items-center gap-1"
-              >
-                {showPassword ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                <span>{showPassword ? "Ẩn" : "Hiện"}</span>
-              </button>
+          {/* Password & Password Confirmation */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-mono text-subtle">Mật khẩu (≥ 6 ký tự) *</label>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="text-[0.65rem] text-muted hover:text-ink flex items-center gap-1"
+                >
+                  {showPassword ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                  <span>{showPassword ? "Ẩn" : "Hiện"}</span>
+                </button>
+              </div>
+              <input
+                required
+                type={showPassword ? "text" : "password"}
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={fieldClass}
+                placeholder="••••••••"
+              />
             </div>
-            <input
-              required
-              type={showPassword ? "text" : "password"}
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className={fieldClass}
-              placeholder="••••••••"
-            />
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-mono text-subtle">Xác nhận mật khẩu *</label>
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="text-[0.65rem] text-muted hover:text-ink flex items-center gap-1"
+                >
+                  {showConfirmPassword ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                  <span>{showConfirmPassword ? "Ẩn" : "Hiện"}</span>
+                </button>
+              </div>
+              <input
+                required
+                type={showConfirmPassword ? "text" : "password"}
+                minLength={6}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className={`${fieldClass} ${
+                  confirmPassword && confirmPassword !== password ? "border-rose-500/80 focus:border-rose-500" : ""
+                }`}
+                placeholder="••••••••"
+              />
+            </div>
           </div>
+
+          {confirmPassword && confirmPassword !== password && (
+            <p className="text-[0.7rem] text-rose-400 font-mono">
+              ⚠️ Mật khẩu xác nhận chưa khớp với mật khẩu đã nhập ở trên.
+            </p>
+          )}
 
           <div>
             <label className="mb-1 block text-xs font-mono text-subtle">Tiểu sử ngắn (Bio)</label>
@@ -632,7 +747,7 @@ export function LoginForm({ locale }: { locale: string }) {
           <button
             type="submit"
             disabled={status === "sending"}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3 text-xs sm:text-sm font-semibold text-white transition hover:bg-accent/90 disabled:opacity-50 dark:text-[#04101F] shadow-lg"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3 text-xs sm:text-sm font-semibold text-white transition hover:bg-accent/90 disabled:opacity-50 dark:text-[#04101F] shadow-lg active:scale-[0.99]"
           >
             {status === "sending" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             Tạo Tài Khoản & Bắt Đầu Ngay
