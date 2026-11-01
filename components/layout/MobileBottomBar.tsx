@@ -14,6 +14,10 @@ export function MobileBottomBar({ locale }: MobileBottomBarProps) {
   const pathname = usePathname();
   const { profile, status } = useAuth();
 
+  if (pathname.includes("/meet")) {
+    return null;
+  }
+
   const profileHref = profile
     ? status === "profile_incomplete"
       ? "/onboarding"

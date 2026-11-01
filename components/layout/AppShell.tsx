@@ -24,6 +24,7 @@ import {
   Copy,
   Layers,
   Award,
+  Video,
 } from "lucide-react";
 import { Logo } from "@/components/brand/Logo";
 import { localePath, type Locale, locales } from "@/lib/i18n/settings";
@@ -149,6 +150,13 @@ export function AppShell({ children, locale }: AppShellProps) {
       icon: Wallet,
     },
     {
+      key: "meet",
+      label: "MysoMeet",
+      href: localePath(locale, "/meet"),
+      icon: Video,
+      badge: "Mới 🔒",
+    },
+    {
       key: "profile",
       label: profile
         ? locale === "vi" ? "Hồ sơ" : locale === "zh-CN" ? "个人主页" : locale === "ja" ? "プロフィール" : "Profile"
@@ -170,6 +178,10 @@ export function AppShell({ children, locale }: AppShellProps) {
       router.push(`${feedPath}?compose=true`);
     }
   };
+
+  if (pathname.includes("/meet")) {
+    return <div className="min-h-screen bg-[#09090B] text-[#FAFAFA] w-full">{children}</div>;
+  }
 
   return (
     <div className="min-h-screen bg-[#09090B] text-[#FAFAFA] flex justify-center">
