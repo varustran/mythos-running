@@ -1,11 +1,11 @@
 /**
  * MysoMeet WebRTC Peer Connection Manager
- * Implements industry-standard WebRTC best practices:
- * 1. Global Multi-STUN Servers (Google, Cloudflare, Twilio)
- * 2. Strict ICE Candidate Queueing (prevents candidates from being dropped before remoteDescription is ready)
- * 3. Track.enabled toggling (never calling track.stop() during mute/unmute)
- * 4. Automatic connection state diagnosis (checking, connected, failed, disconnected)
- * 5. Full teardown cleanup (stops tracks and closes peer connections cleanly)
+ * Standardized for Socket.io and Next.js / React:
+ * 1. Global Multi-STUN Servers
+ * 2. Strict ICE Candidate Queueing (candidateQueue processed ONLY after setRemoteDescription completes)
+ * 3. Track Replacement API for smooth Screen Sharing without peer renegotiation
+ * 4. Lifecyle-safe track muting (track.enabled = false/true)
+ * 5. Full cleanup on exit
  */
 
 export const RTC_CONFIG: RTCConfiguration = {
@@ -32,7 +32,7 @@ export interface PeerEvents {
 export class WebRTCPeerSession {
   public readonly peerId: string;
   public readonly pc: RTCPeerConnection;
-  private pendingCandidates: RTCIceCandidateInit[] = [];
+  private candidateQueue: RTCIceCandidateInit[] = [];
   private hasRemoteDescription = false;
   private events: PeerEvents;
   private isPolite: boolean;
@@ -41,7 +41,7 @@ export class WebRTCPeerSession {
   constructor(peerId: string, myPeerId: string, events: PeerEvents, localStream?: MediaStream) {
     this.peerId = peerId;
     this.events = events;
-    // Tie breaker: lexicographical comparison determines who initiates/accepts glares
+    // Tie-breaker: lexicographical comparison determines polite peer
     this.isPolite = myPeerId > peerId;
 
     this.pc = new RTCPeerConnection(RTC_CONFIG);
@@ -52,32 +52,34 @@ export class WebRTCPeerSession {
         try {
           this.pc.addTrack(track, localStream);
         } catch (e) {
-          console.warn(`[WebRTC] Failed to add track to peer ${peerId}:`, e);
+          console.warn(`[WebRTC] Failed to add track for peer ${peerId}:`, e);
         }
       });
     }
   }
 
   private setupListeners() {
-    // 1. ICE Candidate generation
+    // 1. ICE Candidate generated locally
     this.pc.onicecandidate = (e) => {
       if (e.candidate) {
         this.events.onIceCandidate(this.peerId, e.candidate.toJSON());
       }
     };
 
-    // 2. Track reception from remote peer
-    this.pc.ontrack = (e) => {
-      if (e.streams && e.streams[0]) {
-        this.events.onRemoteStream(this.peerId, e.streams[0]);
+    // 2. Remote track received
+    this.pc.ontrack = (event) => {
+      console.log(`[WebRTC] ontrack received from ${this.peerId}:`, event.track.kind);
+      if (event.streams && event.streams[0]) {
+        this.events.onRemoteStream(this.peerId, event.streams[0]);
       } else {
-        const inboundStream = new MediaStream([e.track]);
+        const inboundStream = new MediaStream([event.track]);
         this.events.onRemoteStream(this.peerId, inboundStream);
       }
     };
 
     // 3. Connection state changes
     this.pc.onconnectionstatechange = () => {
+      console.log(`[WebRTC] Peer ${this.peerId} state:`, this.pc.connectionState);
       this.events.onConnectionStateChange(this.peerId, this.pc.connectionState);
     };
 
@@ -104,13 +106,12 @@ export class WebRTCPeerSession {
     try {
       const offerCollision = this.makingOffer || this.pc.signalingState !== "stable";
       if (offerCollision && !this.isPolite) {
-        // Glare resolution: impolite peer rejects remote offer
-        return;
+        return; // Impolite peer ignores offer collision
       }
 
       await this.pc.setRemoteDescription(new RTCSessionDescription(offer));
       this.hasRemoteDescription = true;
-      await this.flushPendingCandidates();
+      await this.flushCandidateQueue();
 
       const answer = await this.pc.createAnswer();
       await this.pc.setLocalDescription(answer);
@@ -128,7 +129,7 @@ export class WebRTCPeerSession {
       if (this.pc.signalingState === "have-local-offer") {
         await this.pc.setRemoteDescription(new RTCSessionDescription(answer));
         this.hasRemoteDescription = true;
-        await this.flushPendingCandidates();
+        await this.flushCandidateQueue();
       }
     } catch (err) {
       console.warn(`[WebRTC] Error handling answer from ${this.peerId}:`, err);
@@ -137,11 +138,11 @@ export class WebRTCPeerSession {
 
   /**
    * Safe ICE Candidate Queueing:
-   * Adds candidate only if remoteDescription is set, otherwise queues it.
+   * DO NOT call addIceCandidate before setRemoteDescription completes!
    */
   public async addIceCandidate(candidate: RTCIceCandidateInit) {
     if (!this.hasRemoteDescription || !this.pc.remoteDescription) {
-      this.pendingCandidates.push(candidate);
+      this.candidateQueue.push(candidate);
       return;
     }
 
@@ -153,11 +154,11 @@ export class WebRTCPeerSession {
   }
 
   /**
-   * Flush all candidates queued before setRemoteDescription
+   * Flush all candidateQueue once remoteDescription is set
    */
-  private async flushPendingCandidates() {
-    while (this.pendingCandidates.length > 0) {
-      const cand = this.pendingCandidates.shift();
+  private async flushCandidateQueue() {
+    while (this.candidateQueue.length > 0) {
+      const cand = this.candidateQueue.shift();
       if (cand) {
         try {
           await this.pc.addIceCandidate(new RTCIceCandidate(cand));
@@ -169,14 +170,30 @@ export class WebRTCPeerSession {
   }
 
   /**
-   * Replace local track dynamically without renegotiation where possible
+   * Replace Track smoothly for Screen Sharing without renegotiating
    */
-  public replaceTrack(kind: "video" | "audio", newTrack: MediaStreamTrack | null) {
-    const sender = this.pc.getSenders().find((s) => s.track?.kind === kind);
+  public async replaceVideoTrack(newTrack: MediaStreamTrack | null): Promise<void> {
+    const sender = this.pc.getSenders().find((s) => s.track?.kind === "video");
     if (sender) {
-      sender.replaceTrack(newTrack).catch((err) => {
-        console.warn(`[WebRTC] Replace track error (${kind}):`, err);
-      });
+      try {
+        await sender.replaceTrack(newTrack);
+      } catch (err) {
+        console.warn(`[WebRTC] Replace video track failed for ${this.peerId}:`, err);
+      }
+    }
+  }
+
+  /**
+   * Replace Audio Track
+   */
+  public async replaceAudioTrack(newTrack: MediaStreamTrack | null): Promise<void> {
+    const sender = this.pc.getSenders().find((s) => s.track?.kind === "audio");
+    if (sender) {
+      try {
+        await sender.replaceTrack(newTrack);
+      } catch (err) {
+        console.warn(`[WebRTC] Replace audio track failed for ${this.peerId}:`, err);
+      }
     }
   }
 

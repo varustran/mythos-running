@@ -1,17 +1,28 @@
 /**
  * MysoMeet Camera & Microphone Device Manager
  * Bulletproof hardware acquisition for desktop, mobile (iOS/Android), and tablet:
- * 1. Tries Full Video + Audio with preferred device or facingMode
- * 2. Tries Video with broad constraints, then Audio separately
- * 3. Tries Audio only if camera is blocked/absent
- * 4. Falls back to Animated Synthetic MediaStream with user initials if hardware is inaccessible
- * 5. Enumerates devices and monitors device changes
+ * 1. Tries Full Video + Audio
+ * 2. If NotFoundError / DevicesNotFoundError / NotAllowedError occurs, automatically falls back
+ *    to Video-only or Audio-only with dedicated notification messages.
+ * 3. Falls back to Animated Synthetic MediaStream with user initials if hardware is completely unavailable.
+ * 4. Enumerates devices and translates media errors.
  */
 
 export interface AvailableDevices {
   cameras: MediaDeviceInfo[];
   microphones: MediaDeviceInfo[];
   speakers: MediaDeviceInfo[];
+}
+
+export type MediaAcquisitionMode = "full" | "video_only" | "audio_only" | "synthetic";
+
+export interface MediaAcquireResult {
+  stream: MediaStream;
+  hasPhysicalVideo: boolean;
+  hasPhysicalAudio: boolean;
+  mode: MediaAcquisitionMode;
+  notice?: string;
+  error?: string;
 }
 
 /**
@@ -24,23 +35,23 @@ export function parseMediaError(err: any): string {
   const msg = err.message || "";
 
   if (name === "NotAllowedError" || name === "PermissionDeniedError" || msg.includes("Permission denied")) {
-    return "Bạn đã từ chối cấp quyền Camera/Micro. Vui lòng nhấn vào biểu tượng Ổ Khóa 🔒 trên thanh địa chỉ trình duyệt, chọn 'Cho phép' và tải lại.";
+    return "Bạn đã từ chối cấp quyền Camera/Micro. Vui lòng bấm vào biểu tượng Ổ Khóa 🔒 trên thanh địa chỉ URL để cho phép.";
   }
 
   if (name === "NotFoundError" || name === "DevicesNotFoundError" || msg.includes("not found")) {
-    return "Không tìm thấy thiết bị Camera hoặc Micro. Vui lòng kiểm tra lại dây cắm hoặc chọn thiết bị khác.";
+    return "Không tìm thấy thiết bị Camera hoặc Microphone trên máy tính này.";
   }
 
   if (name === "NotReadableError" || name === "TrackStartError" || msg.includes("concurrent")) {
-    return "Camera/Micro đang bị ứng dụng khác chiếm dụng (Zoom, Teams, OBS, Google Meet). Vui lòng tắt các ứng dụng đó rồi thử lại.";
+    return "Webcam/Micro đang bị ứng dụng khác chiếm dụng (Zoom, Teams, OBS). Vui lòng tắt các ứng dụng đó rồi thử lại.";
   }
 
   if (name === "OverconstrainedError") {
-    return "Thông số độ phân giải yêu cầu không tương thích với webcam này.";
+    return "Thông số độ phân giải yêu cầu không tương thích với webcam của thiết bị.";
   }
 
   if (name === "SecurityError") {
-    return "Trình duyệt chặn truy cập MediaDevices vì kết nối không phải HTTPS hoặc iframe bị hạn chế.";
+    return "Trình duyệt chặn truy cập MediaDevices vì kết nối không an toàn.";
   }
 
   return `Lỗi thiết bị (${name || "MediaError"}): ${msg || "Không thể khởi động camera/micro"}`;
@@ -100,13 +111,11 @@ export function createSyntheticStream(name: string): MediaStream {
     const radius = 64 + Math.sin(pulse) * 4;
     pulse += 0.04;
 
-    // Outer glow
     ctx.beginPath();
     ctx.arc(0, 0, radius + 10, 0, Math.PI * 2);
     ctx.fillStyle = `hsla(${hue}, 85%, 55%, 0.15)`;
     ctx.fill();
 
-    // Circle body
     ctx.beginPath();
     ctx.arc(0, 0, radius, 0, Math.PI * 2);
     ctx.fillStyle = "#121215";
@@ -115,7 +124,6 @@ export function createSyntheticStream(name: string): MediaStream {
     ctx.lineWidth = 3;
     ctx.stroke();
 
-    // Initials text
     ctx.fillStyle = `hsl(${hue}, 90%, 65%)`;
     ctx.font = "bold 44px sans-serif";
     ctx.textAlign = "center";
@@ -125,7 +133,7 @@ export function createSyntheticStream(name: string): MediaStream {
 
     ctx.restore();
 
-    // Bottom user name tag
+    // Bottom name tag
     ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
     ctx.fillRect(16, canvas.height - 44, 200, 28);
     ctx.fillStyle = "#FAFAFA";
@@ -139,14 +147,15 @@ export function createSyntheticStream(name: string): MediaStream {
 
   requestAnimationFrame(draw);
 
-  // Fallback silent audio track so WebRTC connections don't break
-  const stream = (canvas as any).captureStream ? (canvas as any).captureStream(30) : new MediaStream();
-
-  return stream;
+  return (canvas as any).captureStream ? (canvas as any).captureStream(30) : new MediaStream();
 }
 
 /**
- * Request user media with graceful multi-tier fallbacks
+ * Request user media with graceful multi-tier fallbacks:
+ * 1. Tries Full Video + Audio
+ * 2. If NotFoundError / DevicesNotFoundError / NotAllowedError occurs, automatically falls back
+ *    to Video-only or Audio-only with dedicated notification messages.
+ * 3. Falls back to Animated Synthetic MediaStream with user initials if hardware is completely unavailable.
  */
 export async function acquireUserMedia(
   options: {
@@ -154,18 +163,14 @@ export async function acquireUserMedia(
     audioDeviceId?: string;
     preferredName?: string;
   } = {}
-): Promise<{
-  stream: MediaStream;
-  hasPhysicalVideo: boolean;
-  hasPhysicalAudio: boolean;
-  error?: string;
-}> {
+): Promise<MediaAcquireResult> {
   if (typeof window === "undefined" || !navigator?.mediaDevices?.getUserMedia) {
     const synth = createSyntheticStream(options.preferredName || "Thành viên Myso");
     return {
       stream: synth,
       hasPhysicalVideo: false,
       hasPhysicalAudio: false,
+      mode: "synthetic",
       error: "Trình duyệt không hỗ trợ MediaDevices API hoặc đang chạy ngoài môi trường HTTPS an toàn.",
     };
   }
@@ -180,9 +185,7 @@ export async function acquireUserMedia(
     ? { deviceId: { exact: audioDeviceId }, echoCancellation: true, noiseSuppression: true }
     : { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
 
-  let lastErr: any = null;
-
-  // Tier 1: Try requested Video + Audio
+  // Step 1: Try full requested Video + Audio
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: videoConstraint,
@@ -192,13 +195,13 @@ export async function acquireUserMedia(
       stream,
       hasPhysicalVideo: stream.getVideoTracks().length > 0,
       hasPhysicalAudio: stream.getAudioTracks().length > 0,
+      mode: "full",
     };
-  } catch (err1) {
-    lastErr = err1;
-    console.warn("Tier 1 (Video+Audio) failed, trying broader constraints:", err1);
+  } catch (err1: any) {
+    console.warn("[MediaManager] Full Video+Audio request failed:", err1);
   }
 
-  // Tier 2: Try basic Video: true, Audio: true (removes complex device/facingMode constraints)
+  // Step 2: Try basic Video: true, Audio: true (removes facingMode / deviceId constraints)
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: true,
@@ -208,54 +211,77 @@ export async function acquireUserMedia(
       stream,
       hasPhysicalVideo: stream.getVideoTracks().length > 0,
       hasPhysicalAudio: stream.getAudioTracks().length > 0,
+      mode: "full",
     };
-  } catch (err2) {
-    lastErr = err2;
-    console.warn("Tier 2 (Basic Video+Audio) failed, trying Video-only:", err2);
+  } catch (err2: any) {
+    console.warn("[MediaManager] Basic Video+Audio request failed:", err2);
   }
 
-  // Tier 3: Try Video only, then separately try Audio
+  // Step 3: Tách luồng riêng biệt - Thử Video riêng, Audio riêng
   let videoStream: MediaStream | null = null;
-  let hasVideo = false;
-  let hasAudio = false;
+  let audioStream: MediaStream | null = null;
+  let videoNotice = "";
+  let audioNotice = "";
 
+  // Thử xin Video riêng
   try {
     videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
-    hasVideo = true;
-  } catch (videoErr) {
-    lastErr = videoErr;
-    console.warn("Video-only failed:", videoErr);
+  } catch (vErr: any) {
+    console.warn("[MediaManager] Video-only request failed:", vErr);
+    videoNotice = parseMediaError(vErr);
   }
 
+  // Thử xin Audio riêng
   try {
-    const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    hasAudio = true;
-    if (videoStream) {
-      audioStream.getAudioTracks().forEach((track) => videoStream!.addTrack(track));
-      return { stream: videoStream, hasPhysicalVideo: true, hasPhysicalAudio: true };
-    } else {
-      // Audio works, but video failed -> combine Audio with Synthetic Video Stream
-      const synth = createSyntheticStream(preferredName);
-      audioStream.getAudioTracks().forEach((track) => synth.addTrack(track));
-      return { stream: synth, hasPhysicalVideo: false, hasPhysicalAudio: true };
-    }
-  } catch (audioErr) {
-    lastErr = audioErr;
-    console.warn("Audio-only failed:", audioErr);
+    audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (aErr: any) {
+    console.warn("[MediaManager] Audio-only request failed:", aErr);
+    audioNotice = parseMediaError(aErr);
   }
 
-  // If video succeeded but audio failed
-  if (videoStream && hasVideo) {
-    return { stream: videoStream, hasPhysicalVideo: true, hasPhysicalAudio: false };
+  // Kịch bản A: Cả 2 đều thành công khi xin riêng
+  if (videoStream && audioStream) {
+    audioStream.getAudioTracks().forEach((track) => videoStream!.addTrack(track));
+    return {
+      stream: videoStream,
+      hasPhysicalVideo: true,
+      hasPhysicalAudio: true,
+      mode: "full",
+    };
   }
 
-  // Tier 4: Total fallback to Synthetic Animated Stream with parsed error
+  // Kịch bản B: Chỉ có Video (Không có Micro rời trên PC)
+  if (videoStream && !audioStream) {
+    return {
+      stream: videoStream,
+      hasPhysicalVideo: true,
+      hasPhysicalAudio: false,
+      mode: "video_only",
+      notice: "Không tìm thấy Micro rời. Đã tự động kích hoạt chế độ Video (Không mic).",
+    };
+  }
+
+  // Kịch bản C: Chỉ có Micro (Không có Webcam rời trên PC)
+  if (!videoStream && audioStream) {
+    const synthVideo = createSyntheticStream(preferredName);
+    audioStream.getAudioTracks().forEach((track) => synthVideo.addTrack(track));
+    return {
+      stream: synthVideo,
+      hasPhysicalVideo: false,
+      hasPhysicalAudio: true,
+      mode: "audio_only",
+      notice: "Không tìm thấy Webcam. Đã tự động kết nối Micro và đại diện ảo.",
+    };
+  }
+
+  // Kịch bản D: Cả 2 đều không có hoặc bị từ chối -> Fallback sang Đại diện ảo
   const fallbackSynth = createSyntheticStream(preferredName);
   return {
     stream: fallbackSynth,
     hasPhysicalVideo: false,
     hasPhysicalAudio: false,
-    error: parseMediaError(lastErr),
+    mode: "synthetic",
+    error: videoNotice || audioNotice || "Không tìm thấy thiết bị hoặc quyền bị chặn.",
   };
 }
 
