@@ -54,6 +54,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const roomId = searchParams.get("roomId");
     const peerId = searchParams.get("peerId");
+    const since = Number(searchParams.get("since") || 0);
 
     if (!roomId) {
       return NextResponse.json({ error: "Missing roomId" }, { status: 400 });
@@ -67,16 +68,20 @@ export async function GET(req: Request) {
       room.peers[peerId].lastSeen = Date.now();
     }
 
-    // Get signals meant for this peer or broadcast
+    // Get signals meant for this peer or broadcast that arrived after 'since'
     const pendingSignals = peerId
       ? room.signals.filter(
-          (s) => s.senderId !== peerId && (!s.targetId || s.targetId === peerId)
+          (s) =>
+            s.senderId !== peerId &&
+            (!s.targetId || s.targetId === peerId) &&
+            s.timestamp > since
         )
       : [];
 
     return NextResponse.json({
       peers: Object.values(room.peers),
       signals: pendingSignals,
+      serverTime: Date.now(),
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

@@ -15,6 +15,38 @@ export interface AvailableDevices {
 }
 
 /**
+ * Translates MediaStream getUserMedia errors into clear, actionable advice
+ */
+export function parseMediaError(err: any): string {
+  if (!err) return "Lỗi không xác định khi truy cập thiết bị.";
+
+  const name = err.name || "";
+  const msg = err.message || "";
+
+  if (name === "NotAllowedError" || name === "PermissionDeniedError" || msg.includes("Permission denied")) {
+    return "Bạn đã từ chối cấp quyền Camera/Micro. Vui lòng nhấn vào biểu tượng Ổ Khóa 🔒 trên thanh địa chỉ trình duyệt, chọn 'Cho phép' và tải lại.";
+  }
+
+  if (name === "NotFoundError" || name === "DevicesNotFoundError" || msg.includes("not found")) {
+    return "Không tìm thấy thiết bị Camera hoặc Micro. Vui lòng kiểm tra lại dây cắm hoặc chọn thiết bị khác.";
+  }
+
+  if (name === "NotReadableError" || name === "TrackStartError" || msg.includes("concurrent")) {
+    return "Camera/Micro đang bị ứng dụng khác chiếm dụng (Zoom, Teams, OBS, Google Meet). Vui lòng tắt các ứng dụng đó rồi thử lại.";
+  }
+
+  if (name === "OverconstrainedError") {
+    return "Thông số độ phân giải yêu cầu không tương thích với webcam này.";
+  }
+
+  if (name === "SecurityError") {
+    return "Trình duyệt chặn truy cập MediaDevices vì kết nối không phải HTTPS hoặc iframe bị hạn chế.";
+  }
+
+  return `Lỗi thiết bị (${name || "MediaError"}): ${msg || "Không thể khởi động camera/micro"}`;
+}
+
+/**
  * Creates an animated synthetic video stream when physical camera is absent or denied
  */
 export function createSyntheticStream(name: string): MediaStream {
@@ -148,6 +180,8 @@ export async function acquireUserMedia(
     ? { deviceId: { exact: audioDeviceId }, echoCancellation: true, noiseSuppression: true }
     : { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
 
+  let lastErr: any = null;
+
   // Tier 1: Try requested Video + Audio
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -160,6 +194,7 @@ export async function acquireUserMedia(
       hasPhysicalAudio: stream.getAudioTracks().length > 0,
     };
   } catch (err1) {
+    lastErr = err1;
     console.warn("Tier 1 (Video+Audio) failed, trying broader constraints:", err1);
   }
 
@@ -175,6 +210,7 @@ export async function acquireUserMedia(
       hasPhysicalAudio: stream.getAudioTracks().length > 0,
     };
   } catch (err2) {
+    lastErr = err2;
     console.warn("Tier 2 (Basic Video+Audio) failed, trying Video-only:", err2);
   }
 
@@ -187,6 +223,7 @@ export async function acquireUserMedia(
     videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
     hasVideo = true;
   } catch (videoErr) {
+    lastErr = videoErr;
     console.warn("Video-only failed:", videoErr);
   }
 
@@ -203,6 +240,7 @@ export async function acquireUserMedia(
       return { stream: synth, hasPhysicalVideo: false, hasPhysicalAudio: true };
     }
   } catch (audioErr) {
+    lastErr = audioErr;
     console.warn("Audio-only failed:", audioErr);
   }
 
@@ -211,13 +249,13 @@ export async function acquireUserMedia(
     return { stream: videoStream, hasPhysicalVideo: true, hasPhysicalAudio: false };
   }
 
-  // Tier 4: Total fallback to Synthetic Animated Stream
+  // Tier 4: Total fallback to Synthetic Animated Stream with parsed error
   const fallbackSynth = createSyntheticStream(preferredName);
   return {
     stream: fallbackSynth,
     hasPhysicalVideo: false,
     hasPhysicalAudio: false,
-    error: "Vui lòng cho phép quyền truy cập Camera & Micro trên thanh địa chỉ trình duyệt.",
+    error: parseMediaError(lastErr),
   };
 }
 

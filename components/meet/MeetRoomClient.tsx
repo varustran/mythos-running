@@ -24,8 +24,8 @@ import {
   Send,
   Camera,
   RefreshCw,
-  Sliders,
-  CheckCircle2,
+  ExternalLink,
+  Zap,
 } from "lucide-react";
 import type { Locale } from "@/lib/i18n/settings";
 import { localePath } from "@/lib/i18n/settings";
@@ -35,8 +35,10 @@ import { VIDEO_FILTERS, type VideoFilterType } from "@/lib/media/videoEffects";
 import {
   acquireUserMedia,
   enumerateDevices,
+  parseMediaError,
   type AvailableDevices,
 } from "@/lib/media/deviceManager";
+import { WebRTCPeerSession } from "@/lib/webrtc/peerManager";
 
 interface ChatMessage {
   id: string;
@@ -55,8 +57,6 @@ interface PeerParticipant {
   isVideoOn: boolean;
   isAudioOn: boolean;
   isSpeaking: boolean;
-  role?: string;
-  stream?: MediaStream;
 }
 
 export function MeetRoomClient({
@@ -95,14 +95,18 @@ export function MeetRoomClient({
   // Streams
   const selfVideoRef = useRef<HTMLVideoElement>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null);
   const [selfAudioLevel, setSelfAudioLevel] = useState(0);
 
   // Layout & UI Drawers
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedEmergencyLink, setCopiedEmergencyLink] = useState(false);
 
   // Security & Anti-Leak States
   const [isScreenMasked, setIsScreenMasked] = useState(false);
@@ -110,8 +114,11 @@ export function MeetRoomClient({
   const [watermarkPos, setWatermarkPos] = useState({ top: 20, left: 25 });
   const [watermarkTimestamp, setWatermarkTimestamp] = useState("");
 
-  // Participants
+  // WebRTC P2P Sessions & Remote Streams
+  const peerSessionsRef = useRef<Map<string, WebRTCPeerSession>>(new Map());
   const [peers, setPeers] = useState<PeerParticipant[]>([]);
+  const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
+  const [connectionStates, setConnectionStates] = useState<Record<string, RTCPeerConnectionState>>({});
 
   // In-Room Chat
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
@@ -119,14 +126,24 @@ export function MeetRoomClient({
       id: "m-welcome",
       senderName: "Hệ thống MysoMeet",
       senderHandle: "system",
-      text: "🔒 Phòng họp đã kết nối mã hóa đầu cuối. Thao tác chuyển tab sẽ kích hoạt màn chắn riêng tư tự động.",
+      text: "🔒 Phòng họp kết nối mã hóa E2EE. Nếu có sự cố mạng/firewall, bạn có thể bấm 'Dự Phòng Khẩn Cấp' ở góc trên.",
       timestamp: "Bắt đầu",
       isSelf: false,
     },
   ]);
   const [chatInput, setChatInput] = useState("");
 
-  // 1. HARDWARE ACQUISITION & CONTROL
+  // Keep localStreamRef synchronized
+  useEffect(() => {
+    localStreamRef.current = localStream;
+  }, [localStream]);
+
+  // Keep screenStreamRef synchronized
+  useEffect(() => {
+    screenStreamRef.current = screenStream;
+  }, [screenStream]);
+
+  // 1. HARDWARE ACQUISITION & CONTROL (Granular try...catch per user checklist)
   const connectMediaHardware = useCallback(async (options?: { camId?: string; micId?: string }) => {
     setHardwareConnecting(true);
     setHardwareNotice(null);
@@ -155,6 +172,14 @@ export function MeetRoomClient({
         setHardwareNotice(null);
       }
 
+      // Update peer connections with new tracks
+      peerSessionsRef.current.forEach((session) => {
+        const vTrack = res.stream.getVideoTracks()[0] || null;
+        const aTrack = res.stream.getAudioTracks()[0] || null;
+        session.replaceTrack("video", vTrack);
+        session.replaceTrack("audio", aTrack);
+      });
+
       const devs = await enumerateDevices();
       setDevices(devs);
       if (devs.cameras.length > 0 && !selectedCameraId) {
@@ -165,7 +190,7 @@ export function MeetRoomClient({
       }
     } catch (err: any) {
       console.warn("Connect media error:", err);
-      setHardwareNotice("Không thể truy cập camera hoặc mic. Đang sử dụng luồng đại diện.");
+      setHardwareNotice(parseMediaError(err));
     } finally {
       setHardwareConnecting(false);
     }
@@ -176,7 +201,7 @@ export function MeetRoomClient({
     connectMediaHardware();
   }, [connectMediaHardware]);
 
-  // Attach stream to video element when stream or video status changes
+  // Attach local stream to selfVideoRef
   useEffect(() => {
     if (selfVideoRef.current && localStream) {
       selfVideoRef.current.srcObject = localStream;
@@ -223,7 +248,7 @@ export function MeetRoomClient({
     };
   }, [localStream]);
 
-  // Toggle Video Track
+  // MUTE / UNMUTE (Lifecycle best practice: toggle track.enabled, never call track.stop())
   const toggleVideo = () => {
     if (localStream) {
       const vTrack = localStream.getVideoTracks()[0];
@@ -231,7 +256,6 @@ export function MeetRoomClient({
         vTrack.enabled = !isVideoOn;
         setIsVideoOn(!isVideoOn);
       } else {
-        // No video track, try re-acquiring
         connectMediaHardware();
         setIsVideoOn(true);
       }
@@ -241,7 +265,6 @@ export function MeetRoomClient({
     }
   };
 
-  // Toggle Audio Track
   const toggleAudio = () => {
     if (localStream) {
       const aTrack = localStream.getAudioTracks()[0];
@@ -249,7 +272,6 @@ export function MeetRoomClient({
         aTrack.enabled = !isAudioOn;
         setIsAudioOn(!isAudioOn);
       } else {
-        // No audio track, try re-acquiring
         connectMediaHardware();
         setIsAudioOn(true);
       }
@@ -259,9 +281,81 @@ export function MeetRoomClient({
     }
   };
 
-  // 2. SIGNALING & PEER DISCOVERY
+  // 2. WebRTC P2P PEER MANAGER & SIGNALING
+  const getOrCreatePeerSession = useCallback(
+    (targetPeerId: string) => {
+      if (peerSessionsRef.current.has(targetPeerId)) {
+        return peerSessionsRef.current.get(targetPeerId)!;
+      }
+
+      const session = new WebRTCPeerSession(
+        targetPeerId,
+        myPeerId,
+        {
+          onRemoteStream: (pid, stream) => {
+            setRemoteStreams((prev) => ({ ...prev, [pid]: stream }));
+          },
+          onIceCandidate: (pid, candidate) => {
+            fetch("/api/meet/signal", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                roomId,
+                peerId: myPeerId,
+                targetId: pid,
+                type: "candidate",
+                payload: candidate,
+              }),
+            }).catch(() => {});
+          },
+          onOffer: (pid, offer) => {
+            fetch("/api/meet/signal", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                roomId,
+                peerId: myPeerId,
+                targetId: pid,
+                type: "offer",
+                payload: offer,
+              }),
+            }).catch(() => {});
+          },
+          onAnswer: (pid, answer) => {
+            fetch("/api/meet/signal", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                roomId,
+                peerId: myPeerId,
+                targetId: pid,
+                type: "answer",
+                payload: answer,
+              }),
+            }).catch(() => {});
+          },
+          onConnectionStateChange: (pid, state) => {
+            setConnectionStates((prev) => ({ ...prev, [pid]: state }));
+            if (state === "failed") {
+              setSecurityAlert(
+                `Kết nối P2P với ${pid.slice(0, 8)} bị chặn bởi NAT/Firewall. Hãy dùng Dự Phòng Khẩn Cấp.`
+              );
+            }
+          },
+        },
+        localStreamRef.current || undefined
+      );
+
+      peerSessionsRef.current.set(targetPeerId, session);
+      return session;
+    },
+    [roomId, myPeerId]
+  );
+
+  // Signaling poll loop with timestamp deduplication
   useEffect(() => {
     let isSubscribed = true;
+    let lastPollTime = 0;
 
     // Join room
     const joinRoom = async () => {
@@ -284,15 +378,19 @@ export function MeetRoomClient({
     };
     joinRoom();
 
-    // Polling loop for heartbeat and incoming signals
     const pollInterval = setInterval(async () => {
       if (!isSubscribed) return;
       try {
-        const res = await fetch(`/api/meet/signal?roomId=${encodeURIComponent(roomId)}&peerId=${encodeURIComponent(myPeerId)}`);
+        const res = await fetch(
+          `/api/meet/signal?roomId=${encodeURIComponent(roomId)}&peerId=${encodeURIComponent(
+            myPeerId
+          )}&since=${lastPollTime}`
+        );
         if (!res.ok) return;
         const data = await res.json();
+        if (data.serverTime) lastPollTime = data.serverTime;
 
-        // Update peers list
+        // 1. Synchronize remote peers list
         if (Array.isArray(data.peers)) {
           const remotePeers = data.peers
             .filter((p: any) => p.id !== myPeerId)
@@ -306,12 +404,28 @@ export function MeetRoomClient({
               isSpeaking: false,
             }));
           setPeers(remotePeers);
+
+          // Instantiate session for any peer not yet tracked
+          remotePeers.forEach((p: PeerParticipant) => {
+            getOrCreatePeerSession(p.id);
+          });
         }
 
-        // Handle signals (chat, etc.)
+        // 2. Dispatch signals
         if (Array.isArray(data.signals)) {
           for (const sig of data.signals) {
-            if (sig.type === "chat" && sig.payload) {
+            const senderId = sig.senderId;
+            if (!senderId || senderId === myPeerId) continue;
+
+            const session = getOrCreatePeerSession(senderId);
+
+            if (sig.type === "offer") {
+              await session.handleOffer(sig.payload);
+            } else if (sig.type === "answer") {
+              await session.handleAnswer(sig.payload);
+            } else if (sig.type === "candidate") {
+              await session.addIceCandidate(sig.payload);
+            } else if (sig.type === "chat" && sig.payload) {
               setChatMessages((prev) => {
                 if (prev.some((m) => m.id === sig.payload.id)) return prev;
                 return [...prev, sig.payload];
@@ -322,35 +436,33 @@ export function MeetRoomClient({
       } catch (err) {
         console.warn("Signal poll error:", err);
       }
-    }, 3000);
+    }, 2500);
 
     return () => {
       isSubscribed = false;
       clearInterval(pollInterval);
-      // Leave notification
       try {
         navigator.sendBeacon?.(
           "/api/meet/signal",
-          JSON.stringify({
-            roomId,
-            peerId: myPeerId,
-            type: "leave",
-          })
+          JSON.stringify({ roomId, peerId: myPeerId, type: "leave" })
         );
       } catch {
         // Beacon fallback
       }
     };
-  }, [roomId, myPeerId, currentUserName, currentUserHandle, currentUserAvatar]);
+  }, [roomId, myPeerId, currentUserName, currentUserHandle, currentUserAvatar, getOrCreatePeerSession]);
 
-  // 3. SECURITY & ANTI-LEAK
+  // 3. SECURITY & ANTI-LEAK (OBS detection + Tab blur + Screenshot prevention)
   useEffect(() => {
     const shield = new AntiLeakShield((event: SecurityEvent) => {
       if (event.type === "screenshot_attempt") {
-        setSecurityAlert("⚠️ CẢNH BÁO BẢO MẬT: Thao tác chụp màn hình đã bị chặn! Bộ nhớ tạm đã được xóa.");
+        setSecurityAlert("⚠️ CẢNH BÁO: Thao tác chụp ảnh màn hình đã bị chặn! Bộ nhớ tạm đã xóa sạch.");
         setTimeout(() => setSecurityAlert(null), 4000);
       } else if (event.type === "tab_hidden" || event.type === "window_blur") {
         setIsScreenMasked(true);
+      } else if (event.type === "obs_detected") {
+        setSecurityAlert("⚠️ PHÁT HIỆN OBS: Đã kích hoạt Watermark pháp y định danh bảo mật cao.");
+        setTimeout(() => setSecurityAlert(null), 6000);
       } else if (event.type === "devtools_detected") {
         setSecurityAlert("⚠️ CẢNH BÁO: Phát hiện công cụ ghi hình/kiểm tra mã nguồn.");
         setTimeout(() => setSecurityAlert(null), 4000);
@@ -427,7 +539,6 @@ export function MeetRoomClient({
     setChatMessages((prev) => [...prev, newMsg]);
     setChatInput("");
 
-    // Broadcast message via signaling server
     try {
       await fetch("/api/meet/signal", {
         method: "POST",
@@ -454,7 +565,7 @@ export function MeetRoomClient({
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
-  // End Call
+  // CLEANUP ON LEAVE / UNMOUNT (Checklist: stop tracks & close peer connections)
   const handleEndCall = () => {
     if (localStream) {
       localStream.getTracks().forEach((t) => t.stop());
@@ -462,8 +573,24 @@ export function MeetRoomClient({
     if (screenStream) {
       screenStream.getTracks().forEach((t) => t.stop());
     }
+    peerSessionsRef.current.forEach((session) => session.close());
+    peerSessionsRef.current.clear();
     router.push(localePath(locale, "/meet"));
   };
+
+  // Clean unmount listener
+  useEffect(() => {
+    return () => {
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((t) => t.stop());
+      }
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach((t) => t.stop());
+      }
+      peerSessionsRef.current.forEach((session) => session.close());
+      peerSessionsRef.current.clear();
+    };
+  }, []);
 
   const activePreset = VIDEO_FILTERS.find((f) => f.id === activeFilter) || VIDEO_FILTERS[0];
 
@@ -499,13 +626,24 @@ export function MeetRoomClient({
           </div>
         </div>
 
-        {/* Security badges & Hardware status */}
+        {/* Security badges & Emergency Backup Toggle */}
         <div className="flex items-center gap-2">
+          {/* Emergency Backup Fallback Button */}
+          <button
+            onClick={() => setIsEmergencyModalOpen(true)}
+            type="button"
+            className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-400 text-xs font-bold transition cursor-pointer"
+            title="Dự phòng khẩn cấp khi mạng yếu hoặc bị chặn firewall"
+          >
+            <Zap className="h-3.5 w-3.5 fill-amber-400" />
+            <span className="hidden sm:inline">Dự Phòng Khẩn Cấp</span>
+          </button>
+
           {!isHardwareActive && (
             <button
               onClick={() => connectMediaHardware()}
               type="button"
-              className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400 text-xs font-bold animate-pulse cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-bold animate-pulse cursor-pointer"
             >
               <Camera className="h-3.5 w-3.5" />
               <span>Bật Camera/Mic</span>
@@ -521,7 +659,7 @@ export function MeetRoomClient({
 
       {/* 2. MAIN MEETING VIEWPORT */}
       <main className="flex-1 relative p-3 sm:p-4 flex items-center justify-center overflow-hidden">
-        {/* Dynamic Forensic Watermark Overlay */}
+        {/* Dynamic Forensic Watermark Overlay (Anti-OBS & External Recording Defense) */}
         <div
           className="absolute pointer-events-none z-10 transition-all duration-1000 ease-out opacity-25 select-none"
           style={{
@@ -545,7 +683,7 @@ export function MeetRoomClient({
 
         {/* Video Grid */}
         <div className="w-full h-full max-w-6xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 items-center justify-center">
-          {/* Tile 1: Self Stream */}
+          {/* Tile 1: Local Stream (CHECKLIST: Local MUST have muted={true} for browser autoplay policy) */}
           <div className="relative aspect-video w-full rounded-2xl sm:rounded-3xl overflow-hidden border border-[#27272A] bg-[#121215] shadow-xl group">
             {isVideoOn ? (
               <video
@@ -577,8 +715,8 @@ export function MeetRoomClient({
             {!isHardwareActive && (
               <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center p-3 text-center">
                 <Camera className="h-8 w-8 text-amber-400 mb-1.5" />
-                <p className="text-xs text-white mb-2 max-w-[200px]">
-                  {hardwareNotice || "Chưa cấp quyền Camera / Mic"}
+                <p className="text-xs text-white mb-2 max-w-[220px] leading-tight">
+                  {hardwareNotice || "Chưa cấp quyền Camera / Micro"}
                 </p>
                 <button
                   onClick={() => connectMediaHardware()}
@@ -616,7 +754,7 @@ export function MeetRoomClient({
             <div className="relative aspect-video w-full rounded-2xl sm:rounded-3xl overflow-hidden border border-amber-500/50 bg-[#121215] shadow-xl">
               <video
                 ref={(node) => {
-                  if (node && screenStream) {
+                  if (node && screenStream && node.srcObject !== screenStream) {
                     node.srcObject = screenStream;
                     node.play().catch(() => {});
                   }
@@ -631,40 +769,61 @@ export function MeetRoomClient({
             </div>
           )}
 
-          {/* Remote Peer Tiles */}
+          {/* Remote Peer Tiles (CHECKLIST: Remote stream has autoPlay playsInline, srcObject bound cleanly) */}
           {peers.length > 0 ? (
-            peers.map((peer) => (
-              <div
-                key={peer.id}
-                className="relative aspect-video w-full rounded-2xl sm:rounded-3xl overflow-hidden border border-[#27272A] bg-[#121215] shadow-xl group"
-              >
-                {peer.avatar ? (
-                  <img
-                    src={peer.avatar}
-                    alt={peer.name}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="h-full w-full flex flex-col items-center justify-center gap-2 bg-[#121215]">
-                    <div className="h-16 w-16 rounded-full bg-[#18181B] border border-[#27272A] flex items-center justify-center text-amber-400 text-xl font-bold">
-                      {peer.name.charAt(0).toUpperCase()}
+            peers.map((peer) => {
+              const remoteStream = remoteStreams[peer.id];
+              const pState = connectionStates[peer.id];
+
+              return (
+                <div
+                  key={peer.id}
+                  className="relative aspect-video w-full rounded-2xl sm:rounded-3xl overflow-hidden border border-[#27272A] bg-[#121215] shadow-xl group"
+                >
+                  {remoteStream && remoteStream.getVideoTracks().length > 0 ? (
+                    <video
+                      ref={(el) => {
+                        if (el && remoteStream && el.srcObject !== remoteStream) {
+                          el.srcObject = remoteStream;
+                          el.play().catch((err) => {
+                            console.warn("Autoplay remote stream prevented:", err);
+                          });
+                        }
+                      }}
+                      autoPlay
+                      playsInline
+                      className="h-full w-full object-cover"
+                    />
+                  ) : peer.avatar ? (
+                    <img
+                      src={peer.avatar}
+                      alt={peer.name}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="h-full w-full flex flex-col items-center justify-center gap-2 bg-[#121215]">
+                      <div className="h-16 w-16 rounded-full bg-[#18181B] border border-[#27272A] flex items-center justify-center text-amber-400 text-xl font-bold">
+                        {peer.name.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="text-xs text-[#71717A] font-mono">
+                        {pState === "connecting" ? "Đang kết nối P2P..." : "Camera đang tắt"}
+                      </span>
                     </div>
-                    <span className="text-xs text-[#71717A] font-mono">Camera đang tắt</span>
+                  )}
+
+                  <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs">
+                    <span className="px-2.5 py-1 rounded-xl bg-black/70 backdrop-blur-md text-[#FAFAFA] font-semibold border border-white/10 flex items-center gap-1.5">
+                      <span>{peer.name}</span>
+                      <span className="text-[10px] text-[#A1A1AA] font-mono hidden sm:inline">@{peer.handle}</span>
+                    </span>
+
+                    <span className="p-1.5 rounded-lg backdrop-blur-md bg-black/60 text-emerald-400">
+                      <Mic className="h-3.5 w-3.5" />
+                    </span>
                   </div>
-                )}
-
-                <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs">
-                  <span className="px-2.5 py-1 rounded-xl bg-black/70 backdrop-blur-md text-[#FAFAFA] font-semibold border border-white/10 flex items-center gap-1.5">
-                    <span>{peer.name}</span>
-                    <span className="text-[10px] text-[#A1A1AA] font-mono hidden sm:inline">@{peer.handle}</span>
-                  </span>
-
-                  <span className="p-1.5 rounded-lg backdrop-blur-md bg-black/60 text-emerald-400">
-                    <Mic className="h-3.5 w-3.5" />
-                  </span>
                 </div>
-              </div>
-            ))
+              );
+            })
           ) : (
             /* Waiting for other participants tile */
             <div className="relative aspect-video w-full rounded-2xl sm:rounded-3xl overflow-hidden border border-dashed border-[#27272A] bg-[#121215]/50 flex flex-col items-center justify-center p-6 text-center">
@@ -700,7 +859,7 @@ export function MeetRoomClient({
               BẢO VỆ RIÊNG TƯ TỰ ĐỘNG (MYSO PRIVACY SHIELD)
             </h2>
             <p className="mt-2 text-sm text-[#A1A1AA] max-w-md leading-relaxed">
-              Bạn đang ở ngoài tab hoặc cửa sổ cuộc họp mất tiêu điểm. Toàn bộ hình ảnh và hội thoại đã được che lại để phòng chống quay lén hoặc ghi hình ngầm.
+              Bạn đang ở ngoài tab hoặc cửa sổ cuộc họp mất tiêu điểm (chuyển sang OBS hoặc ứng dụng khác). Toàn bộ hình ảnh đã được che lại để phòng chống quay lén.
             </p>
             <button
               type="button"
@@ -712,7 +871,84 @@ export function MeetRoomClient({
         )}
       </main>
 
-      {/* 4. IN-MEETING CHAT DRAWER */}
+      {/* 4. EMERGENCY MEETING FALLBACK MODAL (CHECKLIST POINT 5) */}
+      {isEmergencyModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#121215] border border-[#27272A] rounded-3xl p-6 shadow-2xl flex flex-col gap-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[#27272A]">
+              <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
+                <Zap className="h-5 w-5 fill-amber-400" />
+                <span>Phương Án Họp Khẩn Cấp (Backup)</span>
+              </div>
+              <button
+                onClick={() => setIsEmergencyModalOpen(false)}
+                className="text-[#A1A1AA] hover:text-white cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-[#A1A1AA] leading-relaxed">
+              Nếu kết nối WebRTC P2P gặp khó khăn do mạng công ty/firewall chặn STUN, bạn có thể chuyển sang phòng họp dự phòng toàn cầu 0-config:
+            </p>
+
+            <div className="flex flex-col gap-2.5">
+              {/* Option 1: Jitsi Backup */}
+              <a
+                href={`https://meet.jit.si/myso-${roomId}`}
+                target="_blank"
+                rel="noreferrer"
+                className="p-3.5 rounded-2xl bg-[#18181B] hover:bg-[#27272A] border border-[#27272A] hover:border-amber-500/50 flex items-center justify-between transition group"
+              >
+                <div>
+                  <div className="text-xs font-bold text-white group-hover:text-amber-400 transition flex items-center gap-1.5">
+                    <span>Mở Jitsi Meet Dự Phòng</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </div>
+                  <p className="text-[10px] text-[#71717A] mt-0.5 font-mono">meet.jit.si/myso-{roomId}</p>
+                </div>
+                <span className="px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 text-[10px] font-bold">
+                  Sẵn Sàng
+                </span>
+              </a>
+
+              {/* Option 2: Google Meet Backup */}
+              <a
+                href="https://meet.google.com/new"
+                target="_blank"
+                rel="noreferrer"
+                className="p-3.5 rounded-2xl bg-[#18181B] hover:bg-[#27272A] border border-[#27272A] hover:border-blue-500/50 flex items-center justify-between transition group"
+              >
+                <div>
+                  <div className="text-xs font-bold text-white group-hover:text-blue-400 transition flex items-center gap-1.5">
+                    <span>Tạo Cuộc Họp Google Meet</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </div>
+                  <p className="text-[10px] text-[#71717A] mt-0.5">Mở phiên họp mới trên hạ tầng Google</p>
+                </div>
+                <span className="px-2 py-1 rounded-lg bg-blue-500/10 text-blue-400 text-[10px] font-bold">
+                  Khởi Tạo
+                </span>
+              </a>
+            </div>
+
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(`https://meet.jit.si/myso-${roomId}`);
+                setCopiedEmergencyLink(true);
+                setTimeout(() => setCopiedEmergencyLink(false), 2000);
+              }}
+              type="button"
+              className="w-full py-2.5 rounded-xl bg-[#27272A] hover:bg-[#3F3F46] text-white text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {copiedEmergencyLink ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+              <span>{copiedEmergencyLink ? "Đã sao chép liên kết dự phòng" : "Sao chép link Jitsi gửi đối tác"}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 5. IN-MEETING CHAT DRAWER */}
       {isChatOpen && (
         <aside className="absolute right-0 top-14 bottom-20 w-full sm:w-80 md:w-96 bg-[#121215] border-l border-[#27272A] z-30 flex flex-col shadow-2xl">
           <div className="p-4 border-b border-[#27272A] flex items-center justify-between">
@@ -769,7 +1005,7 @@ export function MeetRoomClient({
         </aside>
       )}
 
-      {/* 5. VISUAL EFFECTS DRAWER */}
+      {/* 6. VISUAL EFFECTS DRAWER */}
       {isFiltersOpen && (
         <aside className="absolute right-0 top-14 bottom-20 w-full sm:w-80 bg-[#121215] border-l border-[#27272A] z-30 flex flex-col shadow-2xl p-4">
           <div className="flex items-center justify-between pb-3 border-b border-[#27272A]">
@@ -807,7 +1043,7 @@ export function MeetRoomClient({
         </aside>
       )}
 
-      {/* 6. SETTINGS DRAWER (Device Switcher) */}
+      {/* 7. SETTINGS DRAWER (Device Switcher) */}
       {isSettingsOpen && (
         <aside className="absolute right-0 top-14 bottom-20 w-full sm:w-80 bg-[#121215] border-l border-[#27272A] z-30 flex flex-col shadow-2xl p-4">
           <div className="flex items-center justify-between pb-3 border-b border-[#27272A]">
@@ -836,7 +1072,7 @@ export function MeetRoomClient({
                 className="w-full px-3 py-2 rounded-xl bg-[#18181B] border border-[#27272A] text-white focus:outline-none focus:border-amber-500"
               >
                 {devices.cameras.length > 0 ? (
-                  devices.cameras.map((c) => (
+                  devices.cameras.map((c: MediaDeviceInfo) => (
                     <option key={c.deviceId} value={c.deviceId}>
                       {c.label || `Camera (${c.deviceId.slice(0, 6)})`}
                     </option>
@@ -862,7 +1098,7 @@ export function MeetRoomClient({
                 className="w-full px-3 py-2 rounded-xl bg-[#18181B] border border-[#27272A] text-white focus:outline-none focus:border-amber-500"
               >
                 {devices.microphones.length > 0 ? (
-                  devices.microphones.map((m) => (
+                  devices.microphones.map((m: MediaDeviceInfo) => (
                     <option key={m.deviceId} value={m.deviceId}>
                       {m.label || `Microphone (${m.deviceId.slice(0, 6)})`}
                     </option>
@@ -886,7 +1122,7 @@ export function MeetRoomClient({
         </aside>
       )}
 
-      {/* 7. BOTTOM CONTROL DOCK */}
+      {/* 8. BOTTOM CONTROL DOCK */}
       <footer className="h-20 px-4 bg-[#121215] border-t border-[#27272A] flex items-center justify-between shrink-0 z-20">
         <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-[#71717A]">
           <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />

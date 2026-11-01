@@ -9,7 +9,7 @@
  */
 
 export interface SecurityEvent {
-  type: "screenshot_attempt" | "tab_hidden" | "window_blur" | "devtools_detected" | "clipboard_cleared";
+  type: "screenshot_attempt" | "tab_hidden" | "window_blur" | "devtools_detected" | "clipboard_cleared" | "obs_detected";
   timestamp: number;
   message: string;
 }
@@ -41,6 +41,9 @@ export class AntiLeakShield {
 
     // 4. DevTools Detection Heuristics
     this.startDevToolsWatcher();
+
+    // 5. OBS & Capture Environment Detection
+    this.checkObsEnvironment();
   }
 
   public deactivate() {
@@ -144,6 +147,24 @@ export class AntiLeakShield {
       e.preventDefault();
     }
   };
+
+  private checkObsEnvironment() {
+    if (typeof navigator === "undefined") return;
+    const ua = navigator.userAgent || "";
+    const isObs =
+      ua.includes("OBS/") ||
+      ua.includes("obs-studio") ||
+      Boolean((window as any).obsstudio) ||
+      Boolean((window as any).__OBS_BROWSER_SOURCE__);
+
+    if (isObs) {
+      this.onSecurityEvent({
+        type: "obs_detected",
+        timestamp: Date.now(),
+        message: "Phát hiện môi trường OBS Studio Browser Source. Toàn bộ hình ảnh được đóng dấu pháp y định danh.",
+      });
+    }
+  }
 
   private clearClipboard() {
     try {

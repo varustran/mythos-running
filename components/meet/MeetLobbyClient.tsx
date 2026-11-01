@@ -342,7 +342,7 @@ export function MeetLobbyClient({ locale }: { locale: Locale }) {
                   }}
                   className="px-2.5 py-1.5 rounded-xl bg-[#18181B] border border-[#27272A] text-white focus:outline-none focus:border-amber-500"
                 >
-                  {devices.cameras.map((c) => (
+                  {devices.cameras.map((c: MediaDeviceInfo) => (
                     <option key={c.deviceId} value={c.deviceId}>
                       {c.label || `Camera ${c.deviceId.slice(0, 5)}`}
                     </option>
@@ -363,7 +363,7 @@ export function MeetLobbyClient({ locale }: { locale: Locale }) {
                   }}
                   className="px-2.5 py-1.5 rounded-xl bg-[#18181B] border border-[#27272A] text-white focus:outline-none focus:border-amber-500"
                 >
-                  {devices.microphones.map((m) => (
+                  {devices.microphones.map((m: MediaDeviceInfo) => (
                     <option key={m.deviceId} value={m.deviceId}>
                       {m.label || `Microphone ${m.deviceId.slice(0, 5)}`}
                     </option>
