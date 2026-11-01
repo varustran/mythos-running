@@ -15,8 +15,8 @@ export async function generateMetadata({
   return buildMetadata({
     locale,
     path: `meet/${roomId}`,
-    title: `Phòng Họp ${roomId} · MysoMeet E2EE`,
-    description: "Phòng họp trực tuyến bảo mật cao cấp, chống quay màn hình và che video khi chuyển tab.",
+    title: `Phòng Họp ${roomId} · MysoMeet`,
+    description: "Hội nghị trực tuyến MysoMeet chất lượng cao với âm thanh, camera và bộ lọc thời gian thực.",
   });
 }
 

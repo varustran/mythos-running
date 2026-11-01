@@ -15,8 +15,8 @@ export async function generateMetadata({
   return buildMetadata({
     locale,
     path: "meet",
-    title: "MysoMeet — Phòng Họp Trực Tuyến Bảo Mật & Riêng Tư",
-    description: "Họp trực tuyến mã hóa E2EE, công nghệ chống quay lén, tự động che video khi chuyển tab và bộ lọc camera thời gian thực.",
+    title: "MysoMeet — Phòng Họp Trực Tuyến",
+    description: "Hội nghị truyền hình trực tuyến MysoMeet chất lượng cao với âm thanh, camera mượt mà và bộ lọc thời gian thực.",
   });
 }
 

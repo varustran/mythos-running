@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -23,11 +23,19 @@ import {
   Sliders,
   AlertTriangle,
   Zap,
+  Camera,
+  RefreshCw,
+  CheckCircle2,
 } from "lucide-react";
 import type { Locale } from "@/lib/i18n/settings";
 import { localePath } from "@/lib/i18n/settings";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { VIDEO_FILTERS, type VideoFilterType } from "@/lib/media/videoEffects";
+import {
+  acquireUserMedia,
+  enumerateDevices,
+  type AvailableDevices,
+} from "@/lib/media/deviceManager";
 
 export function MeetLobbyClient({ locale }: { locale: Locale }) {
   const router = useRouter();
@@ -38,6 +46,13 @@ export function MeetLobbyClient({ locale }: { locale: Locale }) {
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState<VideoFilterType>("studio");
+
+  // Device enumeration & selection
+  const [devices, setDevices] = useState<AvailableDevices>({ cameras: [], microphones: [], speakers: [] });
+  const [selectedCameraId, setSelectedCameraId] = useState<string>("");
+  const [selectedMicId, setSelectedMicId] = useState<string>("");
+  const [isHardwareConnected, setIsHardwareConnected] = useState(false);
+  const [connectingMedia, setConnectingMedia] = useState(false);
 
   // Security toggles
   const [antiScreenshot, setAntiScreenshot] = useState(true);
@@ -57,69 +72,90 @@ export function MeetLobbyClient({ locale }: { locale: Locale }) {
     }
   }, [profile]);
 
-  // Initialize camera preview
+  // Request & Connect Camera and Mic
+  const connectHardware = useCallback(async () => {
+    setConnectingMedia(true);
+    setCameraError(null);
+
+    try {
+      const res = await acquireUserMedia({
+        videoDeviceId: selectedCameraId || undefined,
+        audioDeviceId: selectedMicId || undefined,
+        preferredName: userName,
+      });
+
+      setMediaStream(res.stream);
+      setIsHardwareConnected(res.hasPhysicalVideo || res.hasPhysicalAudio);
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = res.stream;
+        videoRef.current.play().catch(() => {});
+      }
+
+      if (res.error) {
+        setCameraError(res.error);
+      }
+
+      // Enumerate devices after permission granted
+      const devs = await enumerateDevices();
+      setDevices(devs);
+      if (devs.cameras.length > 0 && !selectedCameraId) {
+        setSelectedCameraId(devs.cameras[0].deviceId);
+      }
+      if (devs.microphones.length > 0 && !selectedMicId) {
+        setSelectedMicId(devs.microphones[0].deviceId);
+      }
+    } catch (err: any) {
+      console.warn("Connect hardware error:", err);
+      setCameraError(err.message || "Vui lòng cho phép quyền truy cập Camera & Micro trên trình duyệt.");
+    } finally {
+      setConnectingMedia(false);
+    }
+  }, [selectedCameraId, selectedMicId, userName]);
+
+  // Try auto-connect once on mount
   useEffect(() => {
-    let stream: MediaStream | null = null;
+    connectHardware();
+  }, [connectHardware]);
+
+  // Setup Audio Meter
+  useEffect(() => {
+    if (!mediaStream) return;
     let audioContext: AudioContext | null = null;
     let analyser: AnalyserNode | null = null;
-    let animationFrameId: number;
+    let animId: number;
 
-    async function startPreview() {
-      try {
-        setCameraError(null);
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: true,
-        });
+    try {
+      const audioTracks = mediaStream.getAudioTracks();
+      if (audioTracks.length > 0) {
+        audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(mediaStream);
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 64;
+        source.connect(analyser);
 
-        setMediaStream(stream);
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-
-        // Setup audio meter
-        try {
-          audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-          const source = audioContext.createMediaStreamSource(stream);
-          analyser = audioContext.createAnalyser();
-          analyser.fftSize = 64;
-          source.connect(analyser);
-
-          const dataArray = new Uint8Array(analyser.frequencyBinCount);
-          const updateAudioMeter = () => {
-            if (analyser) {
-              analyser.getByteFrequencyData(dataArray);
-              let sum = 0;
-              for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-              const avg = sum / dataArray.length;
-              setAudioLevel(Math.min(100, Math.round((avg / 128) * 100)));
-            }
-            animationFrameId = requestAnimationFrame(updateAudioMeter);
-          };
-          updateAudioMeter();
-        } catch {
-          // Audio context might fail without user interaction
-        }
-      } catch (err: any) {
-        console.warn("Camera preview error:", err);
-        setCameraError("Không thể truy cập camera hoặc mic. Hãy cho phép quyền truy cập thiết bị.");
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        const checkMeter = () => {
+          if (analyser) {
+            analyser.getByteFrequencyData(dataArray);
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+            const avg = sum / dataArray.length;
+            setAudioLevel(Math.min(100, Math.round((avg / 128) * 100)));
+          }
+          animId = requestAnimationFrame(checkMeter);
+        };
+        checkMeter();
       }
+    } catch {
+      // Audio meter fallback
     }
 
-    startPreview();
-
     return () => {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
-      }
-      if (audioContext) {
-        audioContext.close();
-      }
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-      }
+      if (audioContext) audioContext.close();
+      if (animId) cancelAnimationFrame(animId);
     };
-  }, []);
+  }, [mediaStream]);
 
   // Toggle video track
   const toggleVideo = () => {
@@ -160,7 +196,7 @@ export function MeetLobbyClient({ locale }: { locale: Locale }) {
 
   return (
     <div className="min-h-screen bg-[#09090B] text-[#FAFAFA] flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8">
-      {/* Header bar */}
+      {/* Header bar without unwanted subtitle */}
       <div className="w-full max-w-5xl flex items-center justify-between pb-6 border-b border-[#27272A]/80 mb-6">
         <Link href={localePath(locale, "/")} className="flex items-center gap-3 group">
           <div className="h-10 w-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-600 flex items-center justify-center font-black text-black text-lg shadow-[0_0_20px_rgba(245,158,11,0.25)] group-hover:scale-105 transition-transform">
@@ -173,7 +209,6 @@ export function MeetLobbyClient({ locale }: { locale: Locale }) {
                 PRO PRIVACY
               </span>
             </div>
-            <p className="text-xs text-[#A1A1AA]">Phòng họp bảo mật cao & Chống rò rỉ hình ảnh</p>
           </div>
         </Link>
 
@@ -188,13 +223,13 @@ export function MeetLobbyClient({ locale }: { locale: Locale }) {
         <div className="lg:col-span-7 flex flex-col gap-4">
           <div className="relative aspect-video w-full rounded-3xl overflow-hidden border border-[#27272A] bg-[#121215] shadow-2xl group">
             {/* Video Element */}
-            {isVideoEnabled && !cameraError ? (
+            {isVideoEnabled ? (
               <video
                 ref={videoRef}
                 autoPlay
                 playsInline
                 muted
-                className="h-full w-full object-cover mirror-mode transition-all duration-300"
+                className="h-full w-full object-cover transition-all duration-300"
                 style={{
                   filter: activeFilterPreset.cssFilter,
                   transform: "scaleX(-1)",
@@ -205,14 +240,42 @@ export function MeetLobbyClient({ locale }: { locale: Locale }) {
                 <div className="h-20 w-20 rounded-full bg-[#18181B] border border-[#27272A] flex items-center justify-center text-amber-400 text-2xl font-bold">
                   {userName.charAt(0).toUpperCase()}
                 </div>
-                <p className="text-xs font-mono">{cameraError || "Camera đang tắt"}</p>
+                <p className="text-xs font-mono">Camera đang tắt</p>
+              </div>
+            )}
+
+            {/* If camera is not yet connected or has error: big prominent connect button */}
+            {!isHardwareConnected && (
+              <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center p-4 text-center z-10">
+                <Camera className="h-10 w-10 text-amber-400 mb-2 animate-bounce" />
+                <p className="text-xs text-[#FAFAFA] font-medium mb-3 max-w-xs">
+                  {cameraError || "Vui lòng cho phép quyền Camera & Micro để họp trực tuyến"}
+                </p>
+                <div className="flex flex-col sm:flex-row items-center gap-2">
+                  <button
+                    onClick={connectHardware}
+                    disabled={connectingMedia}
+                    type="button"
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold text-xs shadow-lg shadow-amber-500/25 active:scale-95 transition flex items-center gap-2 cursor-pointer"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${connectingMedia ? "animate-spin" : ""}`} />
+                    <span>{connectingMedia ? "Đang kết nối..." : "Bật & Cấp Quyền Camera / Mic"}</span>
+                  </button>
+                  <button
+                    onClick={() => setIsHardwareConnected(true)}
+                    type="button"
+                    className="px-4 py-2.5 rounded-xl bg-[#27272A] hover:bg-[#3F3F46] text-xs font-semibold text-[#FAFAFA] active:scale-95 transition cursor-pointer"
+                  >
+                    Vào với Đại diện ảo
+                  </button>
+                </div>
               </div>
             )}
 
             {/* Overlays: Name & Active filter badge */}
             <div className="absolute top-4 left-4 flex items-center gap-2">
               <span className="px-3 py-1 rounded-xl bg-black/60 backdrop-blur-md text-xs font-semibold border border-white/10 flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className={`h-2 w-2 rounded-full ${isHardwareConnected ? "bg-emerald-400" : "bg-amber-400"} animate-pulse`} />
                 {userName}
               </span>
               <span className="px-2.5 py-1 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-bold backdrop-blur-md">
@@ -227,7 +290,7 @@ export function MeetLobbyClient({ locale }: { locale: Locale }) {
                 <div className="w-16 h-1.5 bg-[#27272A] rounded-full overflow-hidden">
                   <div
                     className="h-full bg-emerald-400 transition-all duration-75"
-                    style={{ width: `${audioLevel}%` }}
+                    style={{ width: `${Math.max(5, audioLevel)}%` }}
                   />
                 </div>
               </div>
@@ -262,6 +325,53 @@ export function MeetLobbyClient({ locale }: { locale: Locale }) {
               </button>
             </div>
           </div>
+
+          {/* Device Selectors (Camera & Mic pickers) */}
+          {devices.cameras.length > 0 && (
+            <div className="p-3 rounded-2xl border border-[#27272A] bg-[#121215] grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-semibold text-[#A1A1AA] flex items-center gap-1.5">
+                  <Camera className="h-3.5 w-3.5 text-amber-400" />
+                  <span>Chọn Camera:</span>
+                </label>
+                <select
+                  value={selectedCameraId}
+                  onChange={(e) => {
+                    setSelectedCameraId(e.target.value);
+                    connectHardware();
+                  }}
+                  className="px-2.5 py-1.5 rounded-xl bg-[#18181B] border border-[#27272A] text-white focus:outline-none focus:border-amber-500"
+                >
+                  {devices.cameras.map((c) => (
+                    <option key={c.deviceId} value={c.deviceId}>
+                      {c.label || `Camera ${c.deviceId.slice(0, 5)}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-semibold text-[#A1A1AA] flex items-center gap-1.5">
+                  <Mic className="h-3.5 w-3.5 text-emerald-400" />
+                  <span>Chọn Microphone:</span>
+                </label>
+                <select
+                  value={selectedMicId}
+                  onChange={(e) => {
+                    setSelectedMicId(e.target.value);
+                    connectHardware();
+                  }}
+                  className="px-2.5 py-1.5 rounded-xl bg-[#18181B] border border-[#27272A] text-white focus:outline-none focus:border-amber-500"
+                >
+                  {devices.microphones.map((m) => (
+                    <option key={m.deviceId} value={m.deviceId}>
+                      {m.label || `Microphone ${m.deviceId.slice(0, 5)}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
 
           {/* Visual Effects & Filters Selector */}
           <div className="p-4 rounded-2xl border border-[#27272A] bg-[#121215] flex flex-col gap-2.5">
